@@ -1,11 +1,11 @@
-import { useEffect } from 'react';
+import { FormEvent, ReactNode, useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { Toaster, toast } from 'sonner';
 import { AppProvider, useApp, CLIENTS } from './context/AppContext';
 
 // Icons
 import {
-  ChevronDown, Bell, Search, ChevronRight
+  ChevronDown, Bell, Search, ChevronRight, ArrowRight, Building2, Briefcase, LogOut, Mail, ShieldCheck, User, Zap
 } from 'lucide-react';
 
 // Sidebar
@@ -40,6 +40,13 @@ import NotificationsScreen from './screens/NotificationsScreen';
 // Shared atoms
 import PlatformDot from './components/shared/PlatformDot';
 
+type LoginProfile = {
+  name: string;
+  email: string;
+  role: string;
+  workspace: string;
+};
+
 export default function App() {
   return (
     <AppProvider>
@@ -49,6 +56,15 @@ export default function App() {
 }
 
 function AppShell() {
+  const [profile, setProfile] = useState<LoginProfile | null>(() => {
+    try {
+      const saved = window.localStorage.getItem('marketiq.profile');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+
   const {
     activeView, setActiveView,
     selectedClientId,
@@ -79,6 +95,22 @@ function AppShell() {
     dataSources, setDataSources,
   } = useApp();
 
+  const initials = useMemo(() => {
+    const source = profile?.name || 'Product Manager';
+    return source
+      .split(' ')
+      .filter(Boolean)
+      .slice(0, 2)
+      .map(part => part[0]?.toUpperCase())
+      .join('') || 'PM';
+  }, [profile]);
+
+  const logout = () => {
+    window.localStorage.removeItem('marketiq.profile');
+    setProfile(null);
+    toast.success('Signed out.');
+  };
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get('connected') === 'true') {
@@ -89,6 +121,10 @@ function AppShell() {
       window.history.replaceState({}, '', `${window.location.pathname}${nextSearch ? `?${nextSearch}` : ''}`);
     }
   }, [setActiveView]);
+
+  if (!profile) {
+    return <LoginScreen onContinue={setProfile} />;
+  }
 
   return (
     <div className="min-h-screen bg-background text-foreground font-sans antialiased">
@@ -126,7 +162,7 @@ function AppShell() {
 
             {/* Breadcrumb */}
             <div className="hidden lg:flex items-center gap-1.5 text-[11px] font-bold">
-              <span className="text-slate-400">Venpep</span>
+              <span className="text-slate-400">{profile.workspace}</span>
               <span className="text-slate-350 font-normal">›</span>
               {activeClient && (
                 <>
@@ -171,13 +207,21 @@ function AppShell() {
             </button>
             <div className="w-px h-4 bg-slate-200 mx-0.5" />
             <div className="flex items-center gap-2 px-2.5 py-1 rounded-xl cursor-pointer hover:bg-slate-50 border border-transparent hover:border-slate-150 transition-colors">
-              <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-slate-600 to-slate-800 flex items-center justify-center text-white text-xs font-bold">PM</div>
+              <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-slate-600 to-slate-800 flex items-center justify-center text-white text-xs font-bold">{initials}</div>
               <div className="hidden md:block">
-                <p className="text-[11px] font-bold text-slate-850 leading-tight">Product Manager</p>
-                <p className="text-[9px] text-slate-400 font-semibold">Owner · Venpep</p>
+                <p className="text-[11px] font-bold text-slate-850 leading-tight">{profile.name}</p>
+                <p className="text-[9px] text-slate-400 font-semibold">{profile.role} - {profile.workspace}</p>
               </div>
               <ChevronDown className="w-3 h-3 text-slate-400 hidden md:block" />
             </div>
+            <button
+              onClick={logout}
+              className="hidden sm:flex h-8 w-8 items-center justify-center rounded-lg border border-transparent bg-transparent text-slate-500 hover:border-slate-200 hover:bg-slate-50 hover:text-slate-800"
+              title="Log out"
+              aria-label="Log out"
+            >
+              <LogOut className="h-4 w-4" />
+            </button>
           </div>
         </header>
 
@@ -275,5 +319,211 @@ function AppShell() {
         }}
       />
     </div>
+  );
+}
+
+function LoginScreen({ onContinue }: { onContinue: (profile: LoginProfile) => void }) {
+  const [form, setForm] = useState<LoginProfile>({
+    name: '',
+    email: '',
+    role: 'Product Manager',
+    workspace: 'Venpep',
+  });
+  const [error, setError] = useState('');
+
+  const updateField = (field: keyof LoginProfile, value: string) => {
+    setForm(prev => ({ ...prev, [field]: value }));
+    if (error) setError('');
+  };
+
+  const submit = (event: FormEvent) => {
+    event.preventDefault();
+    const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim());
+
+    if (!form.name.trim()) {
+      setError('Enter your full name.');
+      return;
+    }
+
+    if (!emailOk) {
+      setError('Enter a valid work email.');
+      return;
+    }
+
+    const profile = {
+      name: form.name.trim(),
+      email: form.email.trim().toLowerCase(),
+      role: form.role.trim() || 'Product Manager',
+      workspace: form.workspace.trim() || 'Venpep',
+    };
+
+    window.localStorage.setItem('marketiq.profile', JSON.stringify(profile));
+    onContinue(profile);
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans antialiased">
+      <Toaster position="top-right" richColors closeButton />
+      <main className="min-h-screen grid lg:grid-cols-[1.05fr_0.95fr]">
+        <section className="hidden lg:flex flex-col justify-between border-r border-slate-200 bg-white px-12 py-10">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-900 text-white shadow-sm">
+              <Zap className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="font-display text-lg font-bold">MarketIQ</p>
+              <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">by Venpep</p>
+            </div>
+          </div>
+
+          <div className="max-w-xl">
+            <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">
+              <span className="h-2 w-2 rounded-full bg-emerald-500" />
+              {apiService.isMockMode ? 'Demo workspace' : 'Live backend workspace'}
+            </div>
+            <h1 className="font-display text-5xl font-extrabold leading-tight tracking-normal text-slate-950">
+              Command your campaigns.
+            </h1>
+            <p className="mt-5 max-w-lg text-base leading-7 text-slate-500">
+              Review campaign health, sync ad platforms, ask AI analysis questions, and prepare client-ready reports from one operating workspace.
+            </p>
+          </div>
+
+          <div className="grid max-w-xl grid-cols-3 gap-3">
+            {[
+              { label: 'Campaign checks', value: '16' },
+              { label: 'AI insights', value: '7' },
+              { label: 'Report exports', value: 'DOCX' },
+            ].map(item => (
+              <div key={item.label} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <p className="font-num text-xl font-bold text-slate-950">{item.value}</p>
+                <p className="mt-1 text-[11px] font-semibold text-slate-500">{item.label}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="flex min-h-screen items-center justify-center px-5 py-8 sm:px-8">
+          <div className="w-full max-w-md">
+            <div className="mb-8 lg:hidden flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-900 text-white shadow-sm">
+                <Zap className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="font-display text-lg font-bold">MarketIQ</p>
+                <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">by Venpep</p>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xl shadow-slate-900/5 sm:p-8">
+              <div className="mb-7">
+                <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-50 text-indigo-700">
+                  <ShieldCheck className="h-5 w-5" />
+                </div>
+                <h2 className="text-2xl font-bold tracking-normal text-slate-950">Sign in to workspace</h2>
+                <p className="mt-2 text-sm leading-6 text-slate-500">
+                  Use your work details to open the agency dashboard.
+                </p>
+              </div>
+
+              <form onSubmit={submit} className="space-y-4">
+                <Field
+                  icon={<User className="h-4 w-4" />}
+                  label="Full name"
+                  value={form.name}
+                  placeholder="Priya Menon"
+                  onChange={value => updateField('name', value)}
+                  autoComplete="name"
+                />
+                <Field
+                  icon={<Mail className="h-4 w-4" />}
+                  label="Work email"
+                  type="email"
+                  value={form.email}
+                  placeholder="priya@venpep.com"
+                  onChange={value => updateField('email', value)}
+                  autoComplete="email"
+                />
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Field
+                    icon={<Briefcase className="h-4 w-4" />}
+                    label="Role"
+                    value={form.role}
+                    placeholder="Product Manager"
+                    onChange={value => updateField('role', value)}
+                    autoComplete="organization-title"
+                  />
+                  <Field
+                    icon={<Building2 className="h-4 w-4" />}
+                    label="Workspace"
+                    value={form.workspace}
+                    placeholder="Venpep"
+                    onChange={value => updateField('workspace', value)}
+                    autoComplete="organization"
+                  />
+                </div>
+
+                {error && (
+                  <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700">
+                    {error}
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  className="mt-2 flex h-11 w-full items-center justify-center gap-2 rounded-xl border-0 bg-slate-900 px-4 text-sm font-bold text-white shadow-sm hover:bg-slate-800"
+                >
+                  Continue to MarketIQ
+                  <ArrowRight className="h-4 w-4" />
+                </button>
+              </form>
+
+              <div className="mt-5 flex items-start gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
+                <ShieldCheck className="mt-0.5 h-4 w-4 flex-shrink-0 text-emerald-600" />
+                <p className="text-xs leading-5 text-slate-500">
+                  This creates a local UI session. Production login should exchange credentials for the backend JWT used by protected API routes.
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+  );
+}
+
+function Field({
+  icon,
+  label,
+  value,
+  placeholder,
+  onChange,
+  type = 'text',
+  autoComplete,
+}: {
+  icon: ReactNode;
+  label: string;
+  value: string;
+  placeholder: string;
+  onChange: (value: string) => void;
+  type?: string;
+  autoComplete?: string;
+}) {
+  return (
+    <label className="block">
+      <span className="mb-1.5 block text-xs font-bold text-slate-700">{label}</span>
+      <span className="flex h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 transition-colors focus-within:border-indigo-500 focus-within:ring-4 focus-within:ring-indigo-500/10">
+        <span className="text-slate-400">{icon}</span>
+        <input
+          type={type}
+          value={value}
+          placeholder={placeholder}
+          onChange={event => onChange(event.target.value)}
+          autoComplete={autoComplete}
+          className="h-full min-w-0 flex-1 border-0 bg-transparent text-sm font-semibold text-slate-900 outline-none placeholder:text-slate-400"
+        />
+      </span>
+    </label>
   );
 }

@@ -11,7 +11,7 @@ export default function ReportsScreen() {
 
   const reports = [
     { id: 1, clientId: 'cai_mahindra', name: 'CAI Mahindra — Weekly Lead Gen digest', frequency: 'Weekly', lastSent: '3 days ago', recipients: 3, status: 'active' },
-    { id: 2, clientId: 'cai_mahindra', name: 'CAI Mahindra — Monthly Spend & ROAS Summary', frequency: 'Monthly', lastSent: '12 days ago', recipients: 4, status: 'active' },
+    { id: 2, clientId: 'cai_mahindra', name: 'CAI Mahindra — Monthly Spend & CPC Summary', frequency: 'Monthly', lastSent: '12 days ago', recipients: 4, status: 'active' },
     { id: 3, clientId: 'cai_mahindra', name: 'CAI Mahindra — Creative fatigue audit', frequency: 'Weekly', lastSent: '1 day ago', recipients: 2, status: 'active' },
     { id: 4, clientId: 'cai_mahindra', name: 'CAI Mahindra — Daily Performance Alert', frequency: 'Daily', lastSent: 'Today 9am', recipients: 5, status: 'paused' }
   ];
@@ -42,7 +42,7 @@ export default function ReportsScreen() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
           { label: 'Reportable Spend', value: formatInr(allSummary.totalSpend), sub: `${campaigns.length} campaigns` },
-          { label: 'Avg ROAS', value: allSummary.avgRoas === null ? 'N/A' : `${allSummary.avgRoas.toFixed(1)}x`, sub: 'Across connected data' },
+          { label: 'Avg CPC', value: allSummary.avgCpc === null ? 'N/A' : `₹${allSummary.avgCpc.toFixed(2)}`, sub: 'Across connected data' },
           { label: 'Alerts', value: allAlerts.length, sub: `${allSummary.criticalCampaigns} critical` },
           { label: 'Recommendations', value: allRecommendations.length, sub: 'Ready for DOCX' },
         ].map(item => (

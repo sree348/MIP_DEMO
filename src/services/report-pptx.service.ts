@@ -33,7 +33,7 @@ export async function downloadReportPptx({ report, client, campaigns, integratio
   const metrics = [
     { title: 'Total Spend', value: `₹${(kpis.totalSpend/1000).toFixed(1)}K`, desc: 'Budget spent' },
     { title: 'Conversions', value: kpis.totalConversions.toLocaleString(), desc: 'Total conversions' },
-    { title: 'Average ROAS', value: `${kpis.avgRoas}x`, desc: 'Multiplier' },
+    { title: 'Blended CPL', value: kpis.totalConversions > 0 ? `₹${(kpis.totalSpend/kpis.totalConversions).toFixed(2)}` : 'N/A', desc: 'Cost per lead' },
     { title: 'Clicks', value: kpis.totalClicks.toLocaleString(), desc: 'Actions taken' },
     { title: 'Avg CTR', value: `${kpis.avgCtr}%`, desc: 'CTR rating' },
     { title: 'Avg CPC', value: `₹${kpis.avgCpc.toFixed(2)}`, desc: 'Cost per click' },
@@ -134,7 +134,7 @@ export async function downloadReportPptx({ report, client, campaigns, integratio
   // Slide 5: Marketing Actions & Creative Fatigue analysis
   const slide5 = pptx.addSlide();
   slide5.addText('Ad Fatigue Warnings & Recommendations', { x: 0.5, y: 0.4, fontSize: 24, bold: true, color: '0F172A', fontFace: 'Trebuchet MS' });
-  slide5.addText('Practical directives to lower frequency fatigue and optimize client ROAS multiplier indices.', { x: 0.5, y: 0.85, fontSize: 11, color: '64748B', fontFace: 'Arial' });
+  slide5.addText('Practical directives to lower frequency fatigue and optimize client CPC cost efficiency loops.', { x: 0.5, y: 0.85, fontSize: 11, color: '64748B', fontFace: 'Arial' });
   
   // Highlight Creative Fatigue Limits
   slide5.addShape(pptx.shapes.RECTANGLE, {
@@ -164,8 +164,8 @@ export async function downloadReportPptx({ report, client, campaigns, integratio
   slide5.addText('💡 HIGH-IMPACT ACQUISITION PLANS', { x: 5.4, y: 1.45, w: 3.9, h: 0.3, fontSize: 13, bold: true, color: '3730A3', fontFace: 'Trebuchet MS' });
   
   const optimizationText = 'Key budget scaling priorities:\n\n' +
-    '1. Scale Winners: Relocate 20% budget share from broad core targeting to top LAL segments showing ROAS > 3.0.\n\n' +
-    '2. Spec Formats: Carousels and Videos represent 75% of clicked actions. Optimize image banners with specifications or specs.\n\n' +
+    '1. Scale Winners: Relocate 20% budget share from broad core targeting to top LAL segments showing CPC below ₹50.00.\n\n' +
+    '2. Spec Formats: Carousels and Videos represent 75% of clicked actions. Optimize ad creatives with specifications or specs.\n\n' +
     '3. Platform Scaling Gaps: Platform reach gaps show Meta saturation. Leverage multi-channel Google placements to capture conversion loops.';
     
   slide5.addText(optimizationText, { x: 5.4, y: 1.9, w: 3.9, h: 3.0, fontSize: 10.5, color: '312E81', fontFace: 'Arial', lineSpacing: 18 });

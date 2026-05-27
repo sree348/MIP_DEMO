@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { getSpendTrend, listCampaigns, listClients } from '../repositories/analytics.repository.js';
 import { fetchMetaAdSets, fetchMetaAds } from '../services/meta.fetch.js';
+import { requireJwtAuth, type AuthenticatedRequest } from '../middleware/auth.middleware.js';
 
 export const analyticsRouter = Router();
 
@@ -37,9 +38,9 @@ analyticsRouter.get('/analytics/spend-trend', async (req, res, next) => {
   }
 });
 
-analyticsRouter.get('/adsets', async (req, res, next) => {
+analyticsRouter.get('/adsets', requireJwtAuth, async (req: AuthenticatedRequest, res, next) => {
   try {
-    const tenantId = getTenantId(req);
+    const tenantId = req.auth!.tenantId;
     const campaignId = req.query.campaignId as string;
     if (!campaignId) {
       return res.status(400).json({ error: 'campaignId query parameter is required' });
@@ -51,9 +52,9 @@ analyticsRouter.get('/adsets', async (req, res, next) => {
   }
 });
 
-analyticsRouter.get('/ads', async (req, res, next) => {
+analyticsRouter.get('/ads', requireJwtAuth, async (req: AuthenticatedRequest, res, next) => {
   try {
-    const tenantId = getTenantId(req);
+    const tenantId = req.auth!.tenantId;
     const adsetId = req.query.adsetId as string;
     if (!adsetId) {
       return res.status(400).json({ error: 'adsetId query parameter is required' });

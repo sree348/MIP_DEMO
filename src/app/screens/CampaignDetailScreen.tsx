@@ -91,7 +91,7 @@ export default function CampaignDetailScreen() {
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-5">
         {[
           { label: 'Spend', value: `$${(campaign.spend / 1000).toFixed(1)}k`, sub: `Budget: $${(campaign.budget / 1000).toFixed(0)}k`, color: 'text-slate-900' },
-          { label: 'ROAS', value: `${campaign.roas}×`, sub: 'Target: 4.0×', color: campaign.roas >= 4 ? 'text-emerald-600' : campaign.roas >= 3 ? 'text-amber-600' : 'text-red-600' },
+          { label: 'CPC', value: `₹${campaign.cpc ? campaign.cpc.toFixed(2) : 'N/A'}`, sub: `CTR: ${campaign.ctr}%`, color: 'text-slate-900' },
           { label: 'Conversions', value: campaign.conv.toLocaleString(), sub: `$${(campaign.spend / campaign.conv).toFixed(0)} CPA`, color: 'text-slate-900' },
           { label: 'CTR', value: `${campaign.ctr}%`, sub: `Avg: ${(campaign.ctr - 0.2).toFixed(2)}%`, color: 'text-slate-900' },
           { label: 'Impressions', value: `${(campaign.impressions / 1000).toFixed(0)}k`, sub: `${campaign.clicks.toLocaleString()} clicks`, color: 'text-slate-900' },
@@ -169,7 +169,7 @@ export default function CampaignDetailScreen() {
                   <p className="text-[10px] text-slate-400">${(campaign.spend / 3 * (1 - i * 0.2)).toFixed(0)} spend</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-xs font-bold text-emerald-600 font-['JetBrains_Mono']">{(campaign.roas + (2 - i) * 0.5).toFixed(1)}× ROAS</p>
+                  <p className="text-xs font-bold text-emerald-600 font-['JetBrains_Mono']">₹{(campaign.cpc * (1 + (i - 1) * 0.15)).toFixed(2)} CPC</p>
                   <p className="text-[10px] text-slate-400">{(campaign.conv / 3 * (1 - i * 0.2)).toFixed(0)} conv.</p>
                 </div>
               </div>

@@ -21,7 +21,7 @@ Rules:
 - Every body must contain at least 2 actual numbers from the data
 - CPC benchmark for India = ₹15–₹80. Above ₹80 is critical.
 - Frequency above 3.0 = warning. Above 4.0 = critical. Pause immediately.
-- ROAS below 2.0 = underperforming. Above 4.0 = scale budget.
+- Cost Per Lead (CPL) benchmark = ₹100–₹500. Above ₹500 is critical. Below ₹150 is excellent, scale budget.
 - CTR below 0.5% = creative fatigue. Above 2% = performing well.
 - Zero conversions with spend above ₹1000 = budget waste, flag as critical.
 - If a campaign is healthy, flag it as opportunity to scale.

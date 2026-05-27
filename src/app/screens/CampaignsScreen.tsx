@@ -730,7 +730,7 @@ export default function CampaignsScreen() {
                 <th className="px-4 py-3 font-bold border-r border-slate-100 text-center">CTR / Clicks</th>
                 <th className="px-4 py-3 font-bold border-r border-slate-100">Budget</th>
                 <th className="px-4 py-3 font-bold border-r border-slate-100 text-right">Amount Spent</th>
-                <th className="px-4 py-3 font-bold text-center">ROAS Ratio</th>
+                <th className="px-4 py-3 font-bold text-center">CPC</th>
               </tr>
             </thead>
 
@@ -824,9 +824,9 @@ export default function CampaignsScreen() {
                           {formatInr(c.spend)}
                         </td>
 
-                        {/* ROAS Ratio */}
+                        {/* CPC */}
                         <td className="px-4 py-2.5 text-center font-bold font-['JetBrains_Mono'] text-indigo-650 bg-indigo-50/5">
-                          {c.roas ? `${c.roas}x` : 'N/A'}
+                           {c.cpc ? `₹${c.cpc.toFixed(2)}` : 'N/A'}
                         </td>
                       </tr>
                     );
@@ -929,9 +929,9 @@ export default function CampaignsScreen() {
                           {formatInr(as.spend)}
                         </td>
 
-                        {/* ROAS */}
+                        {/* CPC */}
                         <td className="px-4 py-2.5 text-center font-bold font-['JetBrains_Mono'] text-indigo-650 bg-indigo-50/5">
-                          {as.roas ? `${as.roas}x` : 'N/A'}
+                           {as.clicks > 0 ? `₹${(as.spend / as.clicks).toFixed(2)}` : as.cpc ? `₹${as.cpc.toFixed(2)}` : 'N/A'}
                         </td>
                       </tr>
                     );
@@ -1042,9 +1042,9 @@ export default function CampaignsScreen() {
                           {formatInr(ad.spend)}
                         </td>
 
-                        {/* ROAS */}
+                        {/* CPC */}
                         <td className="px-4 py-2.5 text-center font-bold font-['JetBrains_Mono'] text-indigo-650 bg-indigo-50/5">
-                          {ad.roas ? `${ad.roas}x` : 'N/A'}
+                           {ad.clicks > 0 ? `₹${(ad.spend / ad.clicks).toFixed(2)}` : ad.cpc ? `₹${ad.cpc.toFixed(2)}` : 'N/A'}
                         </td>
                       </tr>
                     );
@@ -1148,9 +1148,9 @@ export default function CampaignsScreen() {
                     </p>
                   </div>
                   <div>
-                    <p className="text-[9px] font-bold text-slate-450 uppercase tracking-wider">ROAS</p>
+                    <p className="text-[9px] font-bold text-slate-455 uppercase tracking-wider">CPC</p>
                     <p className="font-extrabold text-indigo-700 mt-0.5 font-['JetBrains_Mono'] text-xs">
-                      {selectedAdForPreview.roas ? `${selectedAdForPreview.roas}x` : 'N/A'}
+                      {selectedAdForPreview.clicks > 0 ? `₹${(selectedAdForPreview.spend / selectedAdForPreview.clicks).toFixed(2)}` : 'N/A'}
                     </p>
                   </div>
                 </div>

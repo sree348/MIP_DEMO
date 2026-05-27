@@ -37,3 +37,46 @@ ON CONFLICT (tenant_id, date, platform, campaign_id) DO UPDATE SET
   revenue = EXCLUDED.revenue,
   health_status = EXCLUDED.health_status,
   updated_at = NOW();
+
+INSERT INTO campaign_data (
+  tenant_id, client_id, date, platform, campaign_id, campaign_name, spend,
+  impressions, clicks, reach, frequency, ctr, cpc, cpm, conversions,
+  action_value, roas, status
+)
+SELECT
+  tenant_id,
+  client_id,
+  date,
+  platform,
+  campaign_id,
+  campaign_name,
+  spend::DOUBLE PRECISION,
+  impressions::INTEGER,
+  clicks::INTEGER,
+  impressions::INTEGER AS reach,
+  COALESCE(frequency, 0)::DOUBLE PRECISION,
+  COALESCE(ctr, 0)::DOUBLE PRECISION,
+  COALESCE(cpc, 0)::DOUBLE PRECISION,
+  CASE WHEN impressions = 0 THEN 0 ELSE ((spend / impressions) * 1000)::DOUBLE PRECISION END,
+  conversions::INTEGER,
+  revenue::DOUBLE PRECISION,
+  roas::DOUBLE PRECISION,
+  delivery_status
+FROM campaign_daily
+ON CONFLICT (tenant_id, date, campaign_id) DO UPDATE SET
+  client_id = EXCLUDED.client_id,
+  platform = EXCLUDED.platform,
+  campaign_name = EXCLUDED.campaign_name,
+  spend = EXCLUDED.spend,
+  impressions = EXCLUDED.impressions,
+  clicks = EXCLUDED.clicks,
+  reach = EXCLUDED.reach,
+  frequency = EXCLUDED.frequency,
+  ctr = EXCLUDED.ctr,
+  cpc = EXCLUDED.cpc,
+  cpm = EXCLUDED.cpm,
+  conversions = EXCLUDED.conversions,
+  action_value = EXCLUDED.action_value,
+  roas = EXCLUDED.roas,
+  status = EXCLUDED.status,
+  updated_at = NOW();

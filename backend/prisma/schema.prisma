@@ -90,5 +90,15 @@ model BrainInsight {
   @@map("brain_insights")
 }
 
+model AgencyReport {
+  id         String   @id @default(cuid())
+  tenantId   String   @map("tenant_id")
+  filePath   String   @map("file_path")
+  shareToken String   @unique @map("share_token")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@map("agency_reports")
+}
+
 
 

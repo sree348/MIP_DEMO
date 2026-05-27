@@ -10,8 +10,19 @@ import { metaRouter } from './routes/meta.routes.js';
 import { platformConnectionsRouter } from './routes/platform-connections.route.js';
 import { syncRouter } from './routes/sync.routes.js';
 import { brainRouter } from './routes/brain.routes.js';
+import { reportRouter } from './routes/report.routes.js';
 import { startMetaSyncJob, initializeMetaConnectionFromEnv } from './jobs/meta.sync.job.js';
 import { setIo } from './services/realtime.service.js';
+
+// Setup global error and promise rejection handlers to protect process stability
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('⚠️ [CRITICAL] Unhandled Promise Rejection detected:', reason);
+});
+
+process.on('uncaughtException', (error) => {
+  console.error('⚠️ [CRITICAL] Uncaught Exception detected:', error);
+});
+
 
 const app = express();
 const port = Number(process.env.PORT || 3000);
@@ -70,6 +81,7 @@ app.use('/api/v1', metaRouter);
 app.use('/api/v1', platformConnectionsRouter);
 app.use('/api/v1', syncRouter);
 app.use('/api/v1', brainRouter);
+app.use('/api/v1', reportRouter);
 
 app.use((error: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   res.status(500).json({

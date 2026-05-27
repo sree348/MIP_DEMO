@@ -120,7 +120,7 @@ ${JSON.stringify(data, null, 2)}
 Based strictly on the database results above, write a concise, professional, and natural language answer to the user's question.
 - Reference specific numbers, metrics, platform names, and campaign names from the data.
 - Format money values (which are in INR) clearly with standard currency notation (e.g. ₹83,576 or ₹15.3L).
-- Format ROAS clearly (e.g. 5.8x ROAS).
+- Format CPC/CPL clearly (e.g. ₹4.14 CPC or ₹230 Cost Per Lead) and prioritize Cost Per Click (CPC) or CPL over ROAS since this ad account represents lead generation campaigns.
 - Keep the response direct and short (2-3 sentences max).
 - If the data is empty, mention that no active campaigns or conversions were found matching their criteria.
 `;

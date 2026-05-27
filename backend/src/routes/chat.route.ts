@@ -1,17 +1,23 @@
 import { Router } from 'express';
-import { executeSql } from '../services/db.service.js';
+import { executeReadOnlySql } from '../services/db.service.js';
 import { queryWithGroq } from '../services/groq.service.js';
 import { prisma } from '../services/prisma.service.js';
+import { prepareAiSql } from '../services/sql-safety.service.js';
+import { requireJwtAuth, type AuthenticatedRequest } from '../middleware/auth.middleware.js';
 
 export const chatRouter = Router();
 
 // POST /api/v1/chat
-chatRouter.post('/chat', async (req, res, next) => {
+chatRouter.post('/chat', requireJwtAuth, async (req: AuthenticatedRequest, res, next) => {
   try {
-    const { prompt, tenantId, history = [] } = req.body || {};
+    const { prompt, tenantId = req.auth!.tenantId, history = [] } = req.body || {};
 
     if (!prompt || !tenantId) {
       return res.status(400).json({ error: 'prompt and tenantId are required.' });
+    }
+
+    if (req.auth!.tenantId !== 'agency' && tenantId !== req.auth!.tenantId) {
+      return res.status(403).json({ error: 'Token is not allowed to query this tenant or client scope.' });
     }
 
     // Call Groq to get the SQL and initial structured response
@@ -20,24 +26,11 @@ chatRouter.post('/chat', async (req, res, next) => {
     // Execute the returned SQL against the DB
     let rows: any[] = [];
     if (spec.sql) {
-      // Rewrite SQL:
-      // 1. Replace GOLD_CAMPAIGN_DAILY view name with campaign_data table
-      let sqlToRun = spec.sql.replace(/GOLD_CAMPAIGN_DAILY/g, 'campaign_data');
-
-      // 2. If a specific client is selected (tenantId is client_id in our DB), rewrite tenant_id match
-      if (tenantId && tenantId !== 'agency') {
-        sqlToRun = sqlToRun.replace(/tenant_id\s*=\s*['"]agency['"]/gi, `client_id = '${tenantId}'`);
-        const tenantRegex = new RegExp(`tenant_id\\s*=\\s*['"]?${tenantId}['"]?`, 'gi');
-        sqlToRun = sqlToRun.replace(tenantRegex, `client_id = '${tenantId}'`);
-      } else {
-        // Ensure tenant_id defaults to 'agency' if query ran broad
-        sqlToRun = sqlToRun.replace(/tenant_id\s*=\s*['"]?[^'"]+['"]?/gi, `tenant_id = 'agency'`);
-      }
-
-      console.log('Rewritten SQL to run against campaign_data:', sqlToRun);
+      const sqlToRun = prepareAiSql(spec.sql, tenantId);
+      console.log('Validated AI SQL to run against campaign_data:', sqlToRun);
 
       try {
-        rows = await executeSql(sqlToRun);
+        rows = await executeReadOnlySql(sqlToRun);
       } catch (dbErr: any) {
         console.error('SQL execution failed:', dbErr);
         throw new Error(`Failed to execute AI-generated SQL: ${dbErr.message}`);
@@ -86,11 +79,15 @@ chatRouter.post('/chat', async (req, res, next) => {
 });
 
 // GET /api/v1/chat/history?clientId=
-chatRouter.get('/chat/history', async (req, res, next) => {
+chatRouter.get('/chat/history', requireJwtAuth, async (req: AuthenticatedRequest, res, next) => {
   try {
     const clientId = req.query.clientId as string;
     if (!clientId) {
       return res.status(400).json({ error: 'clientId query parameter is required.' });
+    }
+
+    if (req.auth!.tenantId !== 'agency' && clientId !== req.auth!.tenantId) {
+      return res.status(403).json({ error: 'Token is not allowed to read this chat history.' });
     }
 
     // Fetch the last 50 messages from ConversationHistory, sorted by createdAt ASC
@@ -139,11 +136,15 @@ chatRouter.get('/chat/history', async (req, res, next) => {
 });
 
 // DELETE /api/v1/chat/history?clientId=
-chatRouter.delete('/chat/history', async (req, res, next) => {
+chatRouter.delete('/chat/history', requireJwtAuth, async (req: AuthenticatedRequest, res, next) => {
   try {
     const clientId = req.query.clientId as string;
     if (!clientId) {
       return res.status(400).json({ error: 'clientId query parameter is required.' });
+    }
+
+    if (req.auth!.tenantId !== 'agency' && clientId !== req.auth!.tenantId) {
+      return res.status(403).json({ error: 'Token is not allowed to clear this chat history.' });
     }
 
     await prisma.conversationHistory.deleteMany({

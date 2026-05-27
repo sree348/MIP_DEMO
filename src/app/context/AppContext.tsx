@@ -141,7 +141,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       Promise.all([
         apiService.getClients(),
         apiService.getCampaigns(),
-        apiService.getPlatformConnections(),
+        apiService.getPlatformConnections().catch(() => []),
       ])
       .then(([nextClients, nextCampaigns, platformConnections]: any) => {
         if (cancelled) return;

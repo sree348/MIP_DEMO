@@ -108,3 +108,69 @@ CREATE TABLE IF NOT EXISTS conversation_history (
 );
 
 CREATE INDEX IF NOT EXISTS idx_conversation_history_tenant ON conversation_history(tenant_id);
+
+CREATE TABLE IF NOT EXISTS meta_connections (
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
+  tenant_id TEXT NOT NULL UNIQUE,
+  access_token TEXT NOT NULL,
+  expires_at TIMESTAMPTZ NOT NULL,
+  meta_user_id TEXT NOT NULL,
+  ad_account_id TEXT,
+  connected_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS campaign_data (
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
+  tenant_id TEXT NOT NULL,
+  client_id TEXT,
+  date TIMESTAMPTZ NOT NULL,
+  platform TEXT NOT NULL,
+  campaign_id TEXT NOT NULL,
+  campaign_name TEXT NOT NULL,
+  spend DOUBLE PRECISION NOT NULL DEFAULT 0,
+  impressions INTEGER NOT NULL DEFAULT 0,
+  clicks INTEGER NOT NULL DEFAULT 0,
+  reach INTEGER NOT NULL DEFAULT 0,
+  frequency DOUBLE PRECISION NOT NULL DEFAULT 0,
+  ctr DOUBLE PRECISION NOT NULL DEFAULT 0,
+  cpc DOUBLE PRECISION NOT NULL DEFAULT 0,
+  cpm DOUBLE PRECISION NOT NULL DEFAULT 0,
+  conversions INTEGER NOT NULL DEFAULT 0,
+  action_value DOUBLE PRECISION NOT NULL DEFAULT 0,
+  roas DOUBLE PRECISION,
+  status TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT campaign_data_tenant_date_campaign_id_key UNIQUE (tenant_id, date, campaign_id)
+);
+
+CREATE INDEX IF NOT EXISTS campaign_data_tenant_date_idx ON campaign_data(tenant_id, date);
+
+CREATE TABLE IF NOT EXISTS campaign_scores (
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
+  tenant_id TEXT NOT NULL,
+  campaign_name TEXT NOT NULL,
+  score DOUBLE PRECISION NOT NULL DEFAULT 0,
+  trend TEXT NOT NULL DEFAULT 'stable',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT campaign_scores_tenant_campaign_key UNIQUE (tenant_id, campaign_name)
+);
+
+CREATE TABLE IF NOT EXISTS brain_insights (
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
+  tenant_id TEXT NOT NULL,
+  type TEXT NOT NULL,
+  priority TEXT NOT NULL,
+  title TEXT NOT NULL,
+  body TEXT NOT NULL,
+  campaign_name TEXT NOT NULL,
+  metric TEXT NOT NULL,
+  current_value DOUBLE PRECISION NOT NULL,
+  threshold DOUBLE PRECISION NOT NULL,
+  confidence DOUBLE PRECISION NOT NULL,
+  suggested_action TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);

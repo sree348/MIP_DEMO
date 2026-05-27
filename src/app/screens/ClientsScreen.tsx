@@ -33,7 +33,8 @@ export default function ClientsScreen() {
     const cc = campaigns.filter((c: any) => c.clientId === activeClient.id);
     const cd = dashboards.filter((d: any) => d.clientId === activeClient.id);
     const spend = cc.reduce((s: number, c: any) => s + c.spend, 0);
-    const roas = cc.length ? (cc.reduce((s: number, c: any) => s + c.roas, 0) / cc.length) : 0;
+    const clicks = cc.reduce((s: number, c: any) => s + Number(c.clicks || 0), 0);
+    const avgCpc = clicks > 0 ? spend / clicks : (cc.filter((c: any) => typeof c.cpc === 'number').reduce((sum, c) => sum + Number(c.cpc), 0) / (cc.filter((c: any) => typeof c.cpc === 'number').length || 1));
     const conv = cc.reduce((s: number, c: any) => s + c.conv, 0);
 
     return (
@@ -70,7 +71,7 @@ export default function ClientsScreen() {
             <div className="grid grid-cols-4 gap-3">
               {[
                 { k: 'Ad Spend', v: `$${(spend / 1000).toFixed(1)}k` },
-                { k: 'Avg ROAS', v: `${roas.toFixed(1)}×` },
+                { k: 'Avg CPC', v: `₹${avgCpc.toFixed(2)}` },
                 { k: 'Conversions', v: conv },
                 { k: 'Campaigns', v: cc.length },
               ].map(m => (
@@ -161,7 +162,8 @@ export default function ClientsScreen() {
           const cc = campaigns.filter((c: any) => c.clientId === client.id);
           const cd = dashboards.filter((d: any) => d.clientId === client.id);
           const spend = cc.reduce((s: number, c: any) => s + c.spend, 0);
-          const roas = cc.length ? (cc.reduce((s: number, c: any) => s + c.roas, 0) / cc.length) : 0;
+          const clicks = cc.reduce((s: number, c: any) => s + Number(c.clicks || 0), 0);
+          const avgCpc = clicks > 0 ? spend / clicks : (cc.filter((c: any) => typeof c.cpc === 'number').reduce((sum, c) => sum + Number(c.cpc), 0) / (cc.filter((c: any) => typeof c.cpc === 'number').length || 1));
           return (
             <div key={client.id} className="bg-white rounded-2xl border border-slate-200 overflow-hidden hover:shadow-md transition-all cursor-pointer group" onClick={() => setSelectedClientId(client.id)}>
               <div className={`h-1 bg-gradient-to-r ${client.color}`}></div>
@@ -183,7 +185,7 @@ export default function ClientsScreen() {
                 <div className="grid grid-cols-4 gap-2.5 mb-4">
                   {[
                     { k: 'Spend', v: `$${(spend / 1000).toFixed(1)}k` },
-                    { k: 'ROAS', v: `${roas.toFixed(1)}×`, color: roas >= 4 ? 'text-emerald-600' : roas >= 3 ? 'text-amber-600' : 'text-red-600' },
+                    { k: 'Avg CPC', v: `₹${avgCpc.toFixed(2)}` },
                     { k: 'Campaigns', v: cc.length },
                     { k: 'Dashboards', v: cd.length },
                   ].map(m => (

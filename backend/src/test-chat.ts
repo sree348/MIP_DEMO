@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import { queryWithGroq } from './services/groq.service.js';
-import { executeSql } from './services/db.service.js';
+import { executeReadOnlySql } from './services/db.service.js';
+import { prepareAiSql } from './services/sql-safety.service.js';
 
 async function main() {
   console.log('--- MULTI-QUERY CHAT DIAGNOSTIC ---');
@@ -16,11 +17,12 @@ async function main() {
     console.log(`Testing Prompt: "${prompt}"`);
     try {
       const spec = await queryWithGroq(prompt, tenantId, []);
-      console.log('Generated SQL Query:\n', spec.sql);
+      const sql = prepareAiSql(spec.sql, tenantId);
+      console.log('Generated SQL Query:\n', sql);
       console.log('AI Insight:\n', spec.insight);
 
       console.log('Executing SQL...');
-      const rows = await executeSql(spec.sql);
+      const rows = await executeReadOnlySql(sql);
       console.log(`Success! Received ${rows.length} rows.`);
       console.log('Sample Data:', rows.slice(0, 1));
     } catch (error: any) {

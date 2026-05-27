@@ -77,9 +77,8 @@ export const apiService = {
     if (MOCK_MODE) {
       const campaigns = params.clientId ? mockCampaigns.filter(c => c.clientId === params.clientId) : mockCampaigns;
       const totalSpend = campaigns.reduce((sum, c) => sum + c.spend, 0);
-      const totalClicks = campaigns.reduce((sum, c) => sum + c.clicks, 0);
+      const totalClicks = campaigns.reduce((sum, c) => sum + (c.clicks || 0), 0);
       const totalConversions = campaigns.reduce((sum, c) => sum + c.conv, 0);
-      const actionValue = campaigns.reduce((sum, c) => sum + (c.roas ? c.roas * c.spend : 0), 0);
 
       return {
         totalSpend,
@@ -87,7 +86,7 @@ export const apiService = {
         totalClicks,
         avgFrequency: campaigns.reduce((sum, c) => sum + c.frequency, 0) / (campaigns.length || 1),
         totalConversions,
-        blendedRoas: totalConversions === 0 ? null : actionValue / totalSpend,
+        blendedRoas: totalClicks === 0 ? null : totalSpend / totalClicks, // Return CPC
         currency: 'INR',
       };
     }
@@ -217,10 +216,10 @@ export const apiService = {
           type: 'opportunity',
           priority: 'warning',
           title: 'CAI March 2026 XUV 7XO Scale Budget',
-          body: 'ROAS is at 6.2, which is well above the benchmark of 4.0. We should scale budget to drive more high-value leads.',
+          body: 'CPC is at ₹1.24, which is well below the benchmark of ₹4.00. We should scale budget to drive more high-value leads.',
           campaignName: 'CAI March 2026 XUV 7XO',
-          metric: 'roas',
-          currentValue: 6.2,
+          metric: 'cpc',
+          currentValue: 1.24,
           threshold: 4.0,
           confidence: 0.9,
           suggestedAction: 'Scale budget to capture higher volume.',
@@ -278,5 +277,42 @@ export const apiService = {
   async markAllNotificationsRead() {
     if (MOCK_MODE) return { success: true };
     return request('/notifications/read-all', { method: 'POST' });
+  },
+
+  async getAgencyAiSummary(clientId?: string | null) {
+    if (MOCK_MODE) {
+      return {
+        headline: `Lead Generation Performance: ₹48.5k Spend yielding 453 Leads`,
+        overview: `CAI Mahindra campaigns spent a combined ₹48,536 over the last 30 days, generating 453 conversions at an average Cost Per Click of ₹4.14. Meta remains the dominant channel driving lead volume.`,
+        topWin: `The best-performing campaign by CPC is "CAI MARCH BENEFITS 2026" with optimized click efficiency and strong acquisition costs.`,
+        biggestRisk: `The campaign "Cai_Mahindra_March_XEV_9S_Campaign" displays the highest CPC or zero conversion inefficiency, signaling potential creative fatigue or audience mismatch.`,
+        recommendation: `Relocate 15-20% of budget from Cai_Mahindra_March_XEV_9S_Campaign into high-CTR broad core campaigns, and pause any creatives with frequency above 3.0.`,
+        budgetHealth: `Budget health has warning signs: 1 campaign(s) are spending without conversions.`,
+        keyMetrics: [
+          { label: 'Spend', value: `₹48.5k`, status: 'success' },
+          { label: 'Average CPC', value: `₹4.14`, status: 'success' },
+          { label: 'Conversions', value: '453', status: 'success' },
+          { label: 'Campaigns Count', value: '3', status: 'success' },
+        ],
+      };
+    }
+    return request('/agency/ai-summary', {
+      method: 'POST',
+      body: JSON.stringify({ tenantId: TENANT_ID, clientId, dateRange: 'last_30_days' }),
+    });
+  },
+
+  async generateAgencyReport() {
+    if (MOCK_MODE) {
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      return {
+        downloadUrl: `${API_URL}/agency/report/mock-download`,
+        shareLink: `https://app.marketiq.com/report/share/mock-share-token`,
+        reportId: 'mock-report-id',
+      };
+    }
+    return request<{ downloadUrl: string; shareLink: string; reportId: string }>('/agency/report', {
+      method: 'POST',
+    });
   },
 };

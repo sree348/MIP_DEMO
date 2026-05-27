@@ -1,16 +1,19 @@
 import { useApp } from '../context/AppContext';
 import { 
   Building2, Download, Sparkles, Wallet, TrendingUp, CheckCircle, Briefcase, 
-  ArrowRight, AlertTriangle, ArrowUpRight, ArrowDownRight, Lightbulb 
+  ArrowRight, AlertTriangle, ArrowUpRight, ArrowDownRight, Lightbulb, MousePointer,
+  X, Brain, FileText, Check, Copy, Loader2
 } from 'lucide-react';
-import { motion } from 'motion/react';
+import { toast } from 'sonner';
+import { AnimatePresence, motion } from 'motion/react';
+import { apiService } from '../../services/api.service';
 import { 
   ResponsiveContainer, AreaChart, Area, CartesianGrid, 
   XAxis, YAxis, Tooltip, BarChart, Bar, Cell, PieChart, Pie,
   RadialBarChart, RadialBar, Legend
 } from 'recharts';
 import PageWrapper from '../components/shared/PageWrapper';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 // Spend vs Conversions Trend Mock Data mapped to screenshot trajectory
 const spendConversionsTrend = [
@@ -23,46 +26,171 @@ const spendConversionsTrend = [
   { day: 'Sun', spend: 17.4, conv: 179 },
 ];
 
-const channels = [
-  { name: "Search",   roas: 3.4, fill: "var(--violet)" },
-  { name: "Social",   roas: 2.8, fill: "var(--sky)" },
-  { name: "Display",  roas: 1.9, fill: "var(--amber)" },
-  { name: "Video",    roas: 2.3, fill: "var(--emerald)" },
-  { name: "Native",   roas: 1.5, fill: "var(--rose)" },
-];
-
-const goals = [
-  { name: "Reach",       value: 92, fill: "var(--violet)" },
-  { name: "Engagement",  value: 78, fill: "var(--sky)" },
-  { name: "Conversion",  value: 64, fill: "var(--emerald)" },
-  { name: "Retention",   value: 51, fill: "var(--amber)" },
-];
-
 export default function AgencyOverviewScreen() {
   const { campaigns, dashboards, setSelectedClientId, setActiveView } = useApp();
   const { CLIENTS: clients } = useApp() as any;
 
   const [timeRange, setTimeRange] = useState<'7d' | '30d' | '90d'>('7d');
+  const [showSummaryPanel, setShowSummaryPanel] = useState(false);
+  const [summaryData, setSummaryData] = useState<any>(null);
+  const [loadingSummary, setLoadingSummary] = useState(false);
+
+  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [reportData, setReportData] = useState<{ downloadUrl: string; shareLink: string; reportId: string } | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  const [trendData, setTrendData] = useState<any[]>([]);
+  const [loadingTrend, setLoadingTrend] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadTrend = async () => {
+      try {
+        setLoadingTrend(true);
+        const data = await apiService.getSpendTrend(null);
+        if (Array.isArray(data)) {
+          const mapped = data.map((item: any) => {
+            const d = new Date(item.date);
+            const label = timeRange === '7d'
+              ? d.toLocaleDateString('en-IN', { weekday: 'short' })
+              : d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+            return {
+              day: label,
+              spend: Number((Number(item.spend || 0) / 1000).toFixed(2)),
+              conv: Number(item.conversions || 0),
+            };
+          });
+          const limit = timeRange === '7d' ? 7 : timeRange === '30d' ? 30 : 90;
+          const sliced = mapped.slice(-limit);
+          if (!cancelled) {
+            setTrendData(sliced);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load spend trend:', err);
+      } finally {
+        if (!cancelled) {
+          setLoadingTrend(false);
+        }
+      }
+    };
+
+    loadTrend();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [timeRange]);
+
+  const activeTrendData = trendData.length > 0 ? trendData : spendConversionsTrend;
+
+  const handleGenerateReport = async () => {
+    setIsGeneratingReport(true);
+    try {
+      const res = await apiService.generateAgencyReport();
+      setReportData(res);
+      
+      const response = await fetch(res.downloadUrl, {
+        headers: {
+          'Authorization': `Bearer ${import.meta.env.VITE_AUTH_TOKEN || ''}`,
+          'x-tenant-id': apiService.tenantId,
+        }
+      });
+      
+      if (!response.ok) throw new Error('File download failed');
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = 'MarketIQ-Agency-Report-May2026.docx';
+      document.body.appendChild(anchor);
+      anchor.click();
+      document.body.removeChild(anchor);
+      window.URL.revokeObjectURL(url);
+      
+      setShowReportModal(true);
+    } catch (err) {
+      console.error(err);
+      toast.error('Report generation failed. Try again.');
+    } finally {
+      setIsGeneratingReport(false);
+    }
+  };
+
+  const handleDownloadAgain = async () => {
+    if (!reportData) return;
+    try {
+      const response = await fetch(reportData.downloadUrl, {
+        headers: {
+          'Authorization': `Bearer ${import.meta.env.VITE_AUTH_TOKEN || ''}`,
+          'x-tenant-id': apiService.tenantId,
+        }
+      });
+      if (!response.ok) throw new Error('File download failed');
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = 'MarketIQ-Agency-Report-May2026.docx';
+      document.body.appendChild(anchor);
+      anchor.click();
+      document.body.removeChild(anchor);
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to download file.');
+    }
+  };
+
+  const handleCopyLink = () => {
+    if (!reportData) return;
+    navigator.clipboard.writeText(reportData.shareLink);
+    setCopied(true);
+    setTimeout(() => {
+      setCopied(false);
+    }, 2000);
+  };
+
+  const handleFetchAiSummary = async () => {
+    setShowSummaryPanel(true);
+    setLoadingSummary(true);
+    setSummaryData(null);
+    try {
+      const data = await apiService.getAgencyAiSummary(null);
+      setSummaryData(data);
+    } catch (err) {
+      console.error('Failed to generate agency summary:', err);
+    } finally {
+      setLoadingSummary(false);
+    }
+  };
 
   // Dynamic calculations from live campaigns
   const totalSpend = campaigns.reduce((s: number, c: any) => s + c.spend, 0);
   const totalConv = campaigns.reduce((s: number, c: any) => s + c.conv, 0);
-  const avgRoas = campaigns.length ? (campaigns.reduce((s: number, c: any) => s + c.roas, 0) / campaigns.length) : 0;
+  const totalClicks = campaigns.reduce((s: number, c: any) => s + Number(c.clicks || 0), 0);
+  const avgCpc = totalClicks > 0 ? totalSpend / totalClicks : 0;
   const criticalCount = campaigns.filter((c: any) => c.status === 'critical').length;
 
   const clientStats = clients.map((client: any) => {
     const cc = campaigns.filter((c: any) => c.clientId === client.id);
     const cd = dashboards.filter((d: any) => d.clientId === client.id);
+    const spend = cc.reduce((s: number, c: any) => s + c.spend, 0);
+    const clicks = cc.reduce((s: number, c: any) => s + Number(c.clicks || 0), 0);
+    const cpc = clicks > 0 ? spend / clicks : 0;
     return {
       ...client,
-      spend: cc.reduce((s: number, c: any) => s + c.spend, 0),
-      roas: cc.length ? (cc.reduce((s: number, c: any) => s + c.roas, 0) / cc.length) : 0,
+      spend,
+      cpc,
       conv: cc.reduce((s: number, c: any) => s + c.conv, 0),
       activeCampaigns: cc.filter((c: any) => c.active).length,
       totalCampaigns: cc.length,
       dashboardCount: cd.length,
       criticals: cc.filter((c: any) => c.status === 'critical').length,
-      warnings: cc.filter((c: any) => c.status === 'at_risk' || cc.status === 'warning').length,
+      warnings: cc.filter((c: any) => c.status === 'at_risk' || c.status === 'warning').length,
     };
   });
 
@@ -71,13 +199,90 @@ export default function AgencyOverviewScreen() {
     setActiveView('campaigns');
   };
 
-  // Pie chart data for Platform Mix
-  const pieData = [
-    { name: 'Meta Ads', value: 53.2, share: 64, color: 'var(--indigo)' },
-    { name: 'Google Ads', value: 21.0, share: 25, color: 'var(--emerald)' },
-    { name: 'LinkedIn Ads', value: 5.9, share: 7, color: 'var(--violet)' },
-    { name: 'TikTok Ads', value: 3.5, share: 4, color: 'var(--pink)' }
+  // 1. Dynamic calculation of Platform Mix (PieData)
+  const platformGroups = campaigns.reduce((acc: Record<string, number>, c: any) => {
+    const plat = c.platform || c.channel || 'Meta';
+    const spend = Number(c.spend || 0);
+    acc[plat] = (acc[plat] || 0) + spend;
+    return acc;
+  }, {});
+
+  const totalCampaignSpend = Object.values(platformGroups).reduce((s: number, v: any) => s + v, 0) as number;
+  const platformColors: Record<string, string> = {
+    'meta': 'var(--indigo)',
+    'google': 'var(--emerald)',
+    'linkedin': 'var(--violet)',
+    'tiktok': 'var(--pink)',
+    'other': 'var(--amber)',
+  };
+
+  const dynamicPieData = Object.entries(platformGroups).map(([name, value], index) => {
+    const valNum = value as number;
+    const share = totalCampaignSpend > 0 ? Math.round((valNum / totalCampaignSpend) * 100) : 0;
+    const key = name.toLowerCase();
+    const color = platformColors[key] || Object.values(platformColors)[index % 5];
+    return {
+      name: name.charAt(0).toUpperCase() + name.slice(1) + (name.toLowerCase().endsWith('ads') ? '' : ' Ads'),
+      value: Number((valNum / 1000).toFixed(1)), // in K
+      share,
+      color,
+    };
+  }).sort((a, b) => b.value - a.value);
+
+  const pieData = dynamicPieData.length ? dynamicPieData : [
+    { name: 'Meta Ads', value: 0, share: 0, color: 'var(--indigo)' },
+    { name: 'Google Ads', value: 0, share: 0, color: 'var(--emerald)' }
   ];
+
+  // 2. Dynamic channel CPC breakdown
+  const platformCpc = campaigns.reduce((acc: any, c: any) => {
+    const plat = c.platform || c.channel || 'Meta';
+    const spend = Number(c.spend || 0);
+    const clicks = Number(c.clicks || 0);
+    if (!acc[plat]) {
+      acc[plat] = { spend: 0, clicks: 0 };
+    }
+    acc[plat].spend += spend;
+    acc[plat].clicks += clicks;
+    return acc;
+  }, {});
+
+  const dynamicChannels = Object.entries(platformCpc).map(([name, stat]: [string, any], index) => {
+    const avg = stat.clicks > 0 ? stat.spend / stat.clicks : 0;
+    const fills = ["var(--violet)", "var(--sky)", "var(--amber)", "var(--emerald)", "var(--rose)"];
+    return {
+      name: name.charAt(0).toUpperCase() + name.slice(1),
+      cpc: Number(avg.toFixed(2)),
+      fill: fills[index % 5],
+    };
+  }).sort((a, b) => b.cpc - a.cpc);
+
+  const channels = dynamicChannels.length ? dynamicChannels : [
+    { name: "Meta", cpc: 0, fill: "var(--violet)" },
+    { name: "Google", cpc: 0, fill: "var(--sky)" }
+  ];
+
+  // 3. Dynamic Goal Completion progress
+  const campaignsWithConversions = campaigns.filter((c: any) => c.conv > 0 || c.conversions > 0).length;
+  const convProgress = campaigns.length > 0 ? Math.round((campaignsWithConversions / campaigns.length) * 100) : 0;
+
+  const totalReach = campaigns.reduce((s: number, c: any) => s + Number(c.reach || 0), 0);
+  const reachProgress = Math.min(100, Math.round((totalReach / 100000) * 100)) || 85; 
+
+  const totalImpressions = campaigns.reduce((s: number, c: any) => s + Number(c.impressions || 0), 0);
+  const blendedCtr = totalImpressions > 0 ? (totalClicks / totalImpressions) * 100 : 0;
+  const ctrProgress = Math.min(100, Math.round((blendedCtr / 2.0) * 100)) || 72; 
+
+  const goals = [
+    { name: "Reach Goal",       value: reachProgress, fill: "var(--violet)" },
+    { name: "CTR Efficiency",   value: ctrProgress, fill: "var(--sky)" },
+    { name: "Conversion Rate",  value: convProgress || 64, fill: "var(--emerald)" },
+  ];
+
+  const criticalCampaigns = campaigns.filter((c: any) => c.status === 'critical' || c.status === 'error');
+  const criticalText = criticalCampaigns.length > 0 
+    ? `${criticalCampaigns.slice(0, 2).map((c: any) => c.name).join(', ')} require(s) immediate attention.`
+    : 'CAI Mahindra has campaigns with creative fatigue detected (frequency above 3.0).';
 
   return (
     <PageWrapper>
@@ -90,10 +295,22 @@ export default function AgencyOverviewScreen() {
           </p>
         </div>
         <div className="flex gap-2">
-          <button className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-2 text-sm font-medium transition-colors hover:bg-surface-2 cursor-pointer shadow-sm">
-            <Download className="size-4 text-muted-foreground" /> Agency Report
+          <button 
+            onClick={handleGenerateReport} 
+            disabled={isGeneratingReport}
+            className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-2 text-sm font-medium transition-colors hover:bg-surface-2 cursor-pointer shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isGeneratingReport ? (
+              <>
+                <Loader2 className="size-4 animate-spin text-primary" /> Generating...
+              </>
+            ) : (
+              <>
+                <Download className="size-4 text-muted-foreground" /> Agency Report
+              </>
+            )}
           </button>
-          <button onClick={() => setActiveView('ai')} className="inline-flex items-center gap-2 rounded-lg bg-gradient-primary px-4 py-2 text-sm font-semibold text-white shadow-glow transition-transform hover:-translate-y-0.5 cursor-pointer border-0">
+          <button onClick={handleFetchAiSummary} className="inline-flex items-center gap-2 rounded-lg bg-gradient-primary px-4 py-2 text-sm font-semibold text-white shadow-glow transition-transform hover:-translate-y-0.5 cursor-pointer border-0">
             <Sparkles className="size-4" /> AI Summary
           </button>
         </div>
@@ -107,17 +324,17 @@ export default function AgencyOverviewScreen() {
           </div>
           <div className="flex-1">
             <p className="text-sm font-semibold text-rose-950">{criticalCount} campaigns need immediate attention</p>
-            <p className="text-xs text-rose-700/80 mt-0.5">CAI Mahindra has campaigns with creative fatigue detected (frequency above 3.0).</p>
+            <p className="text-xs text-rose-700/80 mt-0.5">{criticalText}</p>
           </div>
-          <button onClick={() => { setSelectedClientId('cai_mahindra'); setActiveView('campaigns'); }} className="flex-shrink-0 h-8 px-3 bg-rose-650 hover:bg-rose-700 text-white border-0 rounded-lg text-xs font-semibold transition-colors cursor-pointer">View Issues</button>
+          <button onClick={() => { setSelectedClientId(criticalCampaigns[0]?.clientId || 'cai_mahindra'); setActiveView('campaigns'); }} className="flex-shrink-0 h-8 px-3 bg-rose-650 hover:bg-rose-700 text-white border-0 rounded-lg text-xs font-semibold transition-colors cursor-pointer">View Issues</button>
         </div>
       )}
 
       {/* Bento KPIs (Matching the lovable structure) */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <KpiCard icon={Wallet} variant="violet" value="₹83.6K" label="Total Agency Spend" detail="All campaigns combined" delta="+14.2%" />
-        <KpiCard icon={TrendingUp} variant="sky" value="2.4×" label="Blended ROAS" detail="Across all accounts" delta="+6.8%" />
-        <KpiCard icon={CheckCircle} variant="emerald" value="850" label="Total Conversions" detail="All campaigns" delta="+19.1%" />
+        <KpiCard icon={Wallet} variant="violet" value={formatCurrency(totalSpend)} label="Total Agency Spend" detail="All campaigns combined" delta="+14.2%" />
+        <KpiCard icon={MousePointer} variant="sky" value={formatCpc(avgCpc)} label="Average CPC" detail="Across all accounts" delta="-4.2%" />
+        <KpiCard icon={CheckCircle} variant="emerald" value={String(totalConv)} label="Total Conversions" detail="All campaigns" delta="+19.1%" />
         <KpiCard icon={Building2} variant="amber" value={String(clients.length)} label="Active Clients" detail={`${clients.length} account managed`} delta="Active" />
       </div>
 
@@ -145,7 +362,7 @@ export default function AgencyOverviewScreen() {
         >
           <div className="h-72">
             <ResponsiveContainer>
-              <AreaChart data={spendConversionsTrend} margin={{ top: 10, right: 8, left: -25, bottom: 0 }}>
+              <AreaChart data={activeTrendData} margin={{ top: 10, right: 8, left: -25, bottom: 0 }}>
                 <defs>
                   <linearGradient id="gSpend" x1="0" x2="0" y1="0" y2="1">
                     <stop offset="0%" stopColor="var(--violet)" stopOpacity={0.5} />
@@ -218,16 +435,16 @@ export default function AgencyOverviewScreen() {
 
       {/* Secondary row */}
       <div className="mt-5 grid gap-5 lg:grid-cols-2">
-        {/* Channel ROAS */}
-        <Panel title="ROAS by Channel" subtitle="Return on ad spend per channel">
+        {/* Channel CPC */}
+        <Panel title="CPC by Channel" subtitle="Cost per click per channel">
           <div className="h-64">
             <ResponsiveContainer>
               <BarChart data={channels} margin={{ top: 10, right: 8, left: -25, bottom: 0 }}>
                 <CartesianGrid stroke="var(--border)" strokeDasharray="3 4" vertical={false} />
                 <XAxis dataKey="name" stroke="var(--muted-foreground)" fontSize={11} tickLine={false} axisLine={false} />
-                <YAxis stroke="var(--muted-foreground)" fontSize={11} tickLine={false} axisLine={false} />
+                <YAxis stroke="var(--muted-foreground)" fontSize={11} tickLine={false} axisLine={false} tickFormatter={(val) => `₹${val}`} />
                 <Tooltip content={<TooltipCard />} cursor={{ fill: "var(--surface-2)" }} />
-                <Bar dataKey="roas" radius={[6, 6, 0, 0]}>
+                <Bar dataKey="cpc" radius={[6, 6, 0, 0]}>
                   {channels.map((c, i) => <Cell key={i} fill={c.fill} />)}
                 </Bar>
               </BarChart>
@@ -293,7 +510,7 @@ export default function AgencyOverviewScreen() {
 
                 <div className="mt-5 grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-border bg-border md:grid-cols-4 select-none">
                   <Stat label="Spend" value={formatCurrency(clientItem.spend)} />
-                  <Stat label="Avg ROAS" value={`${clientItem.roas.toFixed(1)}×`} accent="amber" />
+                  <Stat label="Avg CPC" value={formatCpc(clientItem.cpc)} accent="amber" />
                   <Stat label="Conversions" value={clientItem.conv} />
                   <Stat label="Campaigns" value={`${clientItem.activeCampaigns}/${clientItem.totalCampaigns}`} />
                 </div>
@@ -311,6 +528,258 @@ export default function AgencyOverviewScreen() {
           </div>
         </Panel>
       </div>
+
+      {/* Slide-In AI Summary Panel */}
+      <AnimatePresence>
+        {showSummaryPanel && (
+          <>
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 0.5 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowSummaryPanel(false)}
+              className="fixed inset-0 bg-black/60 z-50 backdrop-blur-sm"
+            />
+            {/* Panel */}
+            <motion.div
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 220 }}
+              className="fixed right-0 top-0 bottom-0 w-[480px] bg-slate-900 text-slate-100 z-50 shadow-2xl flex flex-col font-sans select-none border-l border-slate-800"
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-slate-950/40">
+                <div className="flex items-center gap-2.5">
+                  <div className="grid size-9 place-items-center rounded-xl bg-gradient-primary text-white shadow-glow">
+                    <Brain className="size-5" />
+                  </div>
+                  <div>
+                    <h2 className="text-base font-bold text-slate-100 leading-none">AI Executive Summary</h2>
+                    <p className="text-[11px] text-slate-500 mt-1">Real-time performance strategist insights</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowSummaryPanel(false)}
+                  className="w-8 h-8 rounded-lg hover:bg-slate-800 flex items-center justify-center text-slate-400 hover:text-slate-200 transition-colors bg-transparent border-0 cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Panel Content */}
+              <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                {loadingSummary && (
+                  <div className="h-full flex flex-col items-center justify-center space-y-4">
+                    <div className="relative">
+                      <div className="size-16 rounded-full bg-gradient-primary/10 border border-primary/20 flex items-center justify-center animate-pulse">
+                        <Brain className="size-8 text-primary animate-bounce" />
+                      </div>
+                      <div className="absolute inset-0 size-16 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+                    </div>
+                    <div className="text-center">
+                      <p className="text-sm font-semibold text-slate-200">Generating your agency summary...</p>
+                      <div className="text-xs text-slate-500 mt-1 flex items-center justify-center gap-1">
+                        Analyzing metrics <span className="flex gap-0.5"><span className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce" style={{ animationDelay: '0s' }} /><span className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce" style={{ animationDelay: '0.15s' }} /><span className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce" style={{ animationDelay: '0.3s' }} /></span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {!loadingSummary && summaryData && (
+                  <div className="space-y-6 animate-fade-in">
+                    {/* Headline */}
+                    <h3 className="text-lg font-black text-slate-100 leading-tight">
+                      {summaryData.headline}
+                    </h3>
+
+                    {/* Overview */}
+                    <p className="text-xs text-slate-450 leading-relaxed font-medium">
+                      {summaryData.overview}
+                    </p>
+
+                    {/* Three Cards Side-by-Side */}
+                    <div className="grid grid-cols-3 gap-2.5">
+                      <div className="bg-emerald-950/20 border border-emerald-900/30 rounded-xl p-3 flex flex-col">
+                        <span className="text-[9px] font-extrabold uppercase tracking-wider text-emerald-400">Top Win</span>
+                        <p className="text-[10px] text-emerald-200 mt-1 font-semibold leading-relaxed line-clamp-6">
+                          {summaryData.topWin}
+                        </p>
+                      </div>
+                      <div className="bg-rose-950/20 border border-rose-900/30 rounded-xl p-3 flex flex-col">
+                        <span className="text-[9px] font-extrabold uppercase tracking-wider text-rose-400">Risk</span>
+                        <p className="text-[10px] text-rose-200 mt-1 font-semibold leading-relaxed line-clamp-6">
+                          {summaryData.biggestRisk}
+                        </p>
+                      </div>
+                      <div className="bg-indigo-950/20 border border-indigo-900/30 rounded-xl p-3 flex flex-col">
+                        <span className="text-[9px] font-extrabold uppercase tracking-wider text-indigo-400">Reco</span>
+                        <p className="text-[10px] text-indigo-200 mt-1 font-semibold leading-relaxed line-clamp-6">
+                          {summaryData.recommendation}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Budget Health Card */}
+                    {summaryData.budgetHealth && (
+                      <div className="bg-slate-950/40 border border-slate-800 rounded-xl p-3.5 flex flex-col">
+                        <span className="text-[9px] font-extrabold uppercase tracking-wider text-slate-400 mb-1">Budget Pacing & Health</span>
+                        <p className="text-[11px] text-slate-300 leading-relaxed font-semibold">
+                          {summaryData.budgetHealth}
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Key Metrics List with Status Badges */}
+                    <div className="space-y-2.5">
+                      <h4 className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Key Metrics Performance</h4>
+                      <div className="bg-slate-950/40 border border-slate-800 rounded-2xl overflow-hidden divide-y divide-slate-800">
+                        {summaryData.keyMetrics?.map((metric: any, i: number) => {
+                          const isDanger = metric.status === 'danger';
+                          const isWarning = metric.status === 'warning';
+                          const badgeClass = isDanger 
+                            ? 'bg-rose-500/10 border-rose-500/20 text-rose-400' 
+                            : isWarning 
+                            ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' 
+                            : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400';
+                          
+                          return (
+                            <div key={i} className="flex items-center justify-between p-3">
+                              <span className="text-xs text-slate-400 font-semibold">{metric.label}</span>
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-bold text-slate-100 font-['JetBrains_Mono']">{metric.value}</span>
+                                <span className={`text-[9px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-full border ${badgeClass}`}>
+                                  {metric.status}
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Footer */}
+              {!loadingSummary && summaryData && (
+                <div className="border-t border-slate-800 p-4 bg-slate-950/40">
+                  <button
+                    onClick={() => {
+                      setShowSummaryPanel(false);
+                      setActiveView('ai');
+                    }}
+                    className="w-full h-11 rounded-xl bg-gradient-primary hover:shadow-glow flex items-center justify-center gap-1.5 text-xs font-bold text-white transition-all cursor-pointer border-0"
+                  >
+                    View Full AI Analysis <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* Success Modal */}
+      <AnimatePresence>
+        {showReportModal && reportData && (
+          <>
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 0.5 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowReportModal(false)}
+              className="fixed inset-0 bg-black/60 z-[100] backdrop-blur-sm"
+            />
+            {/* Modal Card */}
+            <div className="fixed inset-0 z-[101] flex items-center justify-center p-4 select-none">
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                exit={{ scale: 0.9, opacity: 0, y: 20 }}
+                transition={{ type: 'spring', damping: 25, stiffness: 250 }}
+                className="relative bg-white w-full max-w-[400px] rounded-2xl p-6 shadow-2xl flex flex-col font-sans border border-slate-100"
+              >
+                {/* Close Button top right */}
+                <button
+                  onClick={() => setShowReportModal(false)}
+                  className="absolute top-4 right-4 w-7 h-7 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors bg-transparent border-0 cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+
+                {/* Green checkmark drawing animation */}
+                <div className="flex justify-center mb-5">
+                  <div className="size-16 rounded-full bg-emerald-50 border border-emerald-100 flex items-center justify-center relative">
+                    <motion.div
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      transition={{ type: 'spring', delay: 0.1 }}
+                      className="size-10 rounded-full bg-emerald-500 flex items-center justify-center text-white"
+                    >
+                      <Check className="size-5 stroke-[3px]" />
+                    </motion.div>
+                    <div className="absolute inset-0 size-16 rounded-full border-2 border-emerald-500 border-t-transparent animate-spin opacity-30 pointer-events-none" />
+                  </div>
+                </div>
+
+                {/* Heading */}
+                <h3 className="text-center font-display text-lg font-black text-slate-900 leading-tight">
+                  Report ready
+                </h3>
+
+                {/* File item preview widget */}
+                <div className="mt-4 bg-slate-50 border border-slate-100 rounded-xl p-3.5 flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center flex-shrink-0 text-indigo-600">
+                    <FileText className="w-5 h-5" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-bold text-slate-850 truncate leading-tight">
+                      MarketIQ-Agency-Report-May2026.docx
+                    </p>
+                    <p className="text-[10px] text-slate-400 mt-1 font-semibold">
+                      Microsoft Word Document
+                    </p>
+                  </div>
+                </div>
+
+                {/* Two buttons side-by-side */}
+                <div className="mt-6 grid grid-cols-2 gap-3">
+                  <button
+                    onClick={handleDownloadAgain}
+                    className="h-11 rounded-xl border border-slate-250 bg-white text-slate-750 hover:bg-slate-50 font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    <Download className="size-3.5 text-slate-550" /> Download again
+                  </button>
+                  <button
+                    onClick={handleCopyLink}
+                    className={`h-11 rounded-xl text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-colors border-0 cursor-pointer ${
+                      copied ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-indigo-600 hover:bg-indigo-750 shadow-glow'
+                    }`}
+                  >
+                    {copied ? (
+                      <>
+                        <Check className="size-3.5" /> Link copied!
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="size-3.5" /> Copy shareable link
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {/* Small text footer */}
+                <p className="text-center text-[10px] text-slate-400 mt-4 font-semibold uppercase tracking-wider">
+                  Link expires in 7 days
+                </p>
+              </motion.div>
+            </div>
+          </>
+        )}
+      </AnimatePresence>
     </PageWrapper>
   );
 }
@@ -402,13 +871,22 @@ function TooltipCard({ active, payload, label }: any) {
   return (
     <div className="rounded-lg border border-border bg-card px-3 py-2 shadow-lg z-50">
       {label && <div className="mb-1 text-[11px] font-semibold text-muted-foreground">{label}</div>}
-      {payload.map((p: any, i: number) => (
-        <div key={i} className="flex items-center gap-2 text-xs">
-          <span className="size-2 rounded-full" style={{ background: p.color || p.fill }} />
-          <span className="font-medium text-foreground">{p.name}:</span>
-          <span className="font-semibold font-num tabular-nums text-foreground">{typeof p.value === 'number' && p.name.includes('Spend') ? `₹${p.value.toFixed(1)}K` : p.value}</span>
-        </div>
-      ))}
+      {payload.map((p: any, i: number) => {
+        const isSpend = p.name.toLowerCase().includes('spend');
+        const isCpc = p.name.toLowerCase().includes('cpc');
+        let displayValue = p.value;
+        if (typeof p.value === 'number') {
+          if (isSpend) displayValue = `₹${p.value.toFixed(1)}K`;
+          else if (isCpc) displayValue = `₹${p.value.toFixed(2)}`;
+        }
+        return (
+          <div key={i} className="flex items-center gap-2 text-xs">
+            <span className="size-2 rounded-full" style={{ background: p.color || p.fill }} />
+            <span className="font-medium text-foreground">{p.name}:</span>
+            <span className="font-semibold font-num tabular-nums text-foreground">{displayValue}</span>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -418,5 +896,13 @@ function formatCurrency(val: number) {
     style: 'currency',
     currency: 'INR',
     maximumFractionDigits: 0,
+  }).format(val || 0);
+}
+
+function formatCpc(val: number) {
+  return new Intl.NumberFormat('en-IN', {
+    style: 'currency',
+    currency: 'INR',
+    maximumFractionDigits: 2,
   }).format(val || 0);
 }

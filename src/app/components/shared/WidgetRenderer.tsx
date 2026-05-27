@@ -113,7 +113,17 @@ export default function WidgetRenderer({ widget }: WidgetRendererProps) {
     if (k.includes('spend') || k.includes('revenue')) return formatInr(val);
     if (k.includes('cpc') || k.includes('cpm')) return formatCpcCpm(val);
     if (k.includes('roas')) return formatRoas(val);
-    if (k.includes('ctr')) return typeof val === 'number' ? `${(val * 100).toFixed(2)}%` : `${val}%`;
+    if (k.includes('ctr')) {
+      if (typeof val === 'number') {
+        // CTR in this codebase is stored/calculated directly as a percentage (e.g. 0.77 for 0.77%),
+        // so we format it directly without multiplying by 100 again to prevent inflated numbers.
+        return `${val.toFixed(2)}%`;
+      }
+      return `${val}%`;
+    }
+    if (k.includes('frequency') || k.includes('freq')) {
+      return typeof val === 'number' ? val.toFixed(2) : String(val);
+    }
     if (k.includes('clicks') || k.includes('impressions') || k.includes('conversions') || k.includes('reach')) {
       return formatNumber(val);
     }
@@ -357,9 +367,9 @@ export default function WidgetRenderer({ widget }: WidgetRendererProps) {
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="border-b border-border bg-muted/5">
+                <tr className="border-b border-border bg-slate-50 dark:bg-slate-900/50">
                   {keys.map((k) => (
-                    <th key={k} className="px-5 py-3.5 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                    <th key={k} className="px-5 py-3.5 text-xs font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                       {k.replace('_', ' ')}
                     </th>
                   ))}

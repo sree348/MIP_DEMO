@@ -31,3 +31,24 @@ export async function executeSql(sql: string) {
   const result = await pool.query(sql);
   return result.rows;
 }
+
+export async function executeReadOnlySql(sql: string) {
+  if (!pool) {
+    throw new Error('DATABASE_URL is not configured. Set a real connection string before running AI SQL.');
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN READ ONLY');
+    await client.query('SET LOCAL statement_timeout = 5000');
+    await client.query('SET LOCAL idle_in_transaction_session_timeout = 5000');
+    const result = await client.query(sql);
+    await client.query('COMMIT');
+    return result.rows;
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => undefined);
+    throw error;
+  } finally {
+    client.release();
+  }
+}

@@ -1,19 +1,17 @@
 import { fetchAndStoreCampaigns } from './meta.fetch.js';
+import { getPlatformConnection } from '../repositories/platform-connections.repository.js';
 
 type SyncResult = {
   rowsUpserted: number;
   message: string;
 };
 
-const SUPPORTED_PLATFORMS = new Set([
-  'Meta Ads',
-  'TikTok Ads',
-  'LinkedIn Ads',
-  'Google Ads',
-  'Google Analytics 4',
-]);
-
 export async function syncPlatformConnection(connectionId: string, tenantId: string): Promise<SyncResult> {
+  const connection = await getPlatformConnection(connectionId, tenantId);
+  if (!connection) {
+    throw new Error('Platform connection was not found for this tenant.');
+  }
+
   const result = await fetchAndStoreCampaigns(tenantId);
 
   return {
