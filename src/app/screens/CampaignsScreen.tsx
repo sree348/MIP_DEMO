@@ -103,10 +103,10 @@ function getAdsForAdSet(adset: any, campaign: any) {
     headline: ad.headline,
     copy: ad.copy,
     imageUrl: idx === 0 
-      ? 'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?w=120&auto=format&fit=crop&q=60' // Offroad SUV
+      ? 'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?w=800&auto=format&fit=crop&q=80' // Offroad SUV
       : idx === 1
-      ? 'https://images.unsplash.com/photo-1492144534655-ae79c964c9d7?w=120&auto=format&fit=crop&q=60' // Sleek modern car
-      : 'https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=120&auto=format&fit=crop&q=60', // Dark sporty car
+      ? 'https://images.unsplash.com/photo-1492144534655-ae79c964c9d7?w=800&auto=format&fit=crop&q=80' // Sleek modern car
+      : 'https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=800&auto=format&fit=crop&q=80', // Dark sporty car
     spend: Math.round(spend * (idx === 0 ? 0.5 : idx === 1 ? 0.3 : 0.2)),
     clicks: Math.round(clicks * (idx === 0 ? 0.55 : idx === 1 ? 0.28 : 0.17)),
     conv: Math.round(conv * (idx === 0 ? 0.6 : idx === 1 ? 0.3 : 0.1)),
@@ -141,6 +141,9 @@ export default function CampaignsScreen() {
   const [selectedCampaignId, setSelectedCampaignId] = useState<number | string | null>(null);
   const [selectedAdSetId, setSelectedAdSetId] = useState<string | null>(null);
 
+  // Track image loading errors to dynamically replace broken Meta image URLs
+  const [imageErrors, setImageErrors] = useState<Record<string, boolean>>({});
+
   // Checkbox selections for the three tabs
   const [selectedCampaignIds, setSelectedCampaignIds] = useState<Set<number | string>>(new Set());
   const [selectedAdSetIds, setSelectedAdSetIds] = useState<Set<string>>(new Set());
@@ -156,16 +159,18 @@ export default function CampaignsScreen() {
   const [isLoadingAds, setIsLoadingAds] = useState(false);
   const [selectedAdForPreview, setSelectedAdForPreview] = useState<any | null>(null);
 
-  // Status and date filters
+  // Status and month filters
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'paused' | 'draft' | 'inactive'>('all');
-  const [dateRange, setDateRange] = useState<'30d' | '90d' | '180d' | 'ytd'>('180d');
+  const [selectedMonth, setSelectedMonth] = useState<string>('all');
   const [showCalendarDropdown, setShowCalendarDropdown] = useState(false);
-  const [selectedRangeLabel, setSelectedRangeLabel] = useState('Last 180 Days');
+  const [selectedRangeLabel, setSelectedRangeLabel] = useState('All Months');
 
   // ═══════════════════════════════════════════════════════════════════════════════
-  // GENERATE DYNAMIC AD SETS & ADS ACROSS SYNCHRONIZED METRICS
+  // GENERATE DYNAMIC AD SETS & ADS ACROSS SYNCHRONIZED METRICS (MOCK MODE ONLY)
   // ═══════════════════════════════════════════════════════════════════════════════
   useEffect(() => {
+    if (!apiService.isMockMode) return;
+
     // Generate adsets for all matching campaigns
     const sets = campaigns.flatMap(c => getAdSetsForCampaign(c));
     setAllAdSets(sets);
@@ -225,14 +230,27 @@ export default function CampaignsScreen() {
   }, [selectedAdSetId]);
 
   // Proportional filter list depending on row checked states and status filter
-  const filteredCampaigns = campaigns.filter(c => {
-    if (statusFilter === 'all') return true;
-    if (statusFilter === 'active') return c.active || c.status === 'active';
-    if (statusFilter === 'paused') return !c.active && c.status === 'paused';
-    if (statusFilter === 'draft') return c.status === 'draft';
-    if (statusFilter === 'inactive') return !c.active || c.status !== 'active';
-    return true;
-  });
+  const filteredCampaigns = campaigns
+    .filter(c => {
+      // Status filter
+      if (statusFilter !== 'all') {
+        if (statusFilter === 'active') return c.active || c.status === 'active';
+        if (statusFilter === 'paused') return !c.active && c.status === 'paused';
+        if (statusFilter === 'draft') return c.status === 'draft';
+        if (statusFilter === 'inactive') return !c.active || c.status !== 'active';
+      }
+      // Month filter
+      if (selectedMonth && selectedMonth !== 'all') {
+        const [y, m] = selectedMonth.split('-').map(Number);
+        return c.month === m && c.year === y;
+      }
+      return true;
+    })
+    .sort((a, b) => {
+      // Sort by year then month descending so most recent first
+      if (b.year !== a.year) return b.year - a.year;
+      return b.month - a.month;
+    });
 
   const filteredAdSets = allAdSets.filter(as => {
     // Filter by status filter
@@ -624,24 +642,21 @@ export default function CampaignsScreen() {
                   {/* Presets Grid */}
                   <div className="grid grid-cols-2 gap-1.5">
                     {[
-                      { id: '30d', label: 'Last 30 Days' },
-                      { id: '90d', label: 'Last 90 Days' },
-                      { id: '180d', label: 'Last 180 Days' },
-                      { id: 'ytd', label: 'Year to Date' },
+                      { id: 'all', label: 'All Months' },
+                      { id: '2026-05', label: 'May 2026' },
+                      { id: '2026-04', label: 'April 2026' },
+                      { id: '2026-03', label: 'March 2026' },
+                      { id: '2026-02', label: 'February 2026' },
                     ].map(preset => (
                       <button
                         key={preset.id}
                         onClick={() => {
-                          setDateRange(preset.id as any);
+                          setSelectedMonth(preset.id);
                           setSelectedRangeLabel(preset.label);
                           setShowCalendarDropdown(false);
-                          toast.success(`Filtered by: ${preset.label}`);
+                          toast.success(`Filtering for ${preset.label}`);
                         }}
-                        className={`h-8 rounded-lg text-[11px] font-bold transition-all border cursor-pointer ${
-                          dateRange === preset.id
-                            ? 'bg-indigo-50 border-indigo-200 text-indigo-700 font-extrabold'
-                            : 'bg-slate-50 border-slate-150 text-slate-650 hover:bg-slate-100 hover:text-slate-800'
-                        }`}
+                        className={`px-3 py-2 rounded-lg text-[11px] font-bold border ${selectedMonth === preset.id ? 'bg-indigo-600 text-white border-indigo-700' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'}`}
                       >
                         {preset.label}
                       </button>
@@ -675,14 +690,14 @@ export default function CampaignsScreen() {
                     </div>
                     <button
                       onClick={() => {
-                        setDateRange('ytd');
-                        setSelectedRangeLabel('Custom Range');
+                        setSelectedMonth('all');
+                        setSelectedRangeLabel('All Months');
                         setShowCalendarDropdown(false);
-                        toast.success('Custom date range applied');
+                        toast.success('Month filter reset');
                       }}
                       className="h-8 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 transition-all cursor-pointer border-0 mt-1 shadow-sm"
                     >
-                      Apply Custom Range
+                      Reset Month Filter
                     </button>
                   </div>
                 </motion.div>
@@ -826,7 +841,7 @@ export default function CampaignsScreen() {
 
                         {/* CPC */}
                         <td className="px-4 py-2.5 text-center font-bold font-['JetBrains_Mono'] text-indigo-650 bg-indigo-50/5">
-                           {c.cpc ? `₹${c.cpc.toFixed(2)}` : 'N/A'}
+                           {c.clicks > 0 ? `₹${(c.spend / c.clicks).toFixed(2)}` : c.cpc ? `₹${c.cpc.toFixed(2)}` : 'N/A'}
                         </td>
                       </tr>
                     );
@@ -983,20 +998,20 @@ export default function CampaignsScreen() {
                         {/* Ad Name & Preview */}
                         <td className="px-4 py-2.5 font-bold border-r border-slate-150">
                           <div className="flex items-start gap-3.5 max-w-sm">
-                            {ad.imageUrl ? (
+                            {ad.imageUrl && !imageErrors[ad.id] ? (
                               <img
                                 src={ad.imageUrl}
                                 alt={ad.name}
                                 onClick={() => setSelectedAdForPreview(ad)}
                                 className="w-14 h-9 object-cover rounded-lg flex-shrink-0 shadow-sm border border-slate-100 bg-slate-50 cursor-zoom-in hover:scale-105 active:scale-95 transition-all animate-fade-in"
-                                onError={(e) => {
-                                  (e.target as any).style.display = 'none';
+                                onError={() => {
+                                  setImageErrors(prev => ({ ...prev, [ad.id]: true }));
                                 }}
                               />
                             ) : (
                               <div 
                                 onClick={() => setSelectedAdForPreview(ad)}
-                                className={`w-14 h-9 bg-gradient-to-br ${ad.bgGradient || 'from-indigo-500 to-purple-600'} rounded-lg flex items-center justify-center text-white flex-shrink-0 shadow-inner border border-slate-100 cursor-zoom-in hover:scale-105 active:scale-95 transition-all`}
+                                className={`w-14 h-9 bg-gradient-to-br ${ad.bgGradient || 'from-indigo-500 to-purple-650'} rounded-lg flex items-center justify-center text-white flex-shrink-0 shadow-inner border border-slate-100 cursor-zoom-in hover:scale-105 active:scale-95 transition-all`}
                               >
                                 <Tv className="w-4 h-4 stroke-[2px]" />
                               </div>
@@ -1091,15 +1106,18 @@ export default function CampaignsScreen() {
               </button>
 
               {/* Large Media Container */}
-              <div className="relative aspect-video w-full bg-slate-900 flex items-center justify-center overflow-hidden border-b border-slate-100">
-                {selectedAdForPreview.imageUrl ? (
+              <div className="relative max-h-[350px] min-h-[220px] w-full bg-slate-950 flex items-center justify-center overflow-hidden border-b border-slate-100">
+                {selectedAdForPreview.imageUrl && !imageErrors[selectedAdForPreview.id] ? (
                   <img 
                     src={selectedAdForPreview.imageUrl} 
                     alt="Creative Preview" 
-                    className="w-full h-full object-cover"
+                    className="w-full h-full max-h-[350px] object-contain"
+                    onError={() => {
+                      setImageErrors(prev => ({ ...prev, [selectedAdForPreview.id]: true }));
+                    }}
                   />
                 ) : (
-                  <div className={`w-full h-full bg-gradient-to-br ${selectedAdForPreview.bgGradient || 'from-indigo-500 to-purple-650'} flex flex-col items-center justify-center text-white p-6 text-center`}>
+                  <div className={`w-full aspect-video min-h-[220px] max-h-[350px] bg-gradient-to-br ${selectedAdForPreview.bgGradient || 'from-indigo-500 to-purple-650'} flex flex-col items-center justify-center text-white p-6 text-center`}>
                     <Tv className="w-12 h-12 stroke-[1.5px] mb-2 drop-shadow-md animate-pulse" />
                     <p className="text-xs font-bold opacity-80 tracking-wide uppercase">Mock Media Representation</p>
                   </div>
@@ -1110,7 +1128,7 @@ export default function CampaignsScreen() {
               <div className="p-6">
                 <div className="flex items-center gap-2 mb-3">
                   <span className="text-[9px] font-extrabold tracking-wider uppercase bg-indigo-50 border border-indigo-150 text-indigo-700 px-2 py-0.5 rounded-full">
-                    {selectedAdForPreview.imageUrl ? 'Meta Graph API Ad Creative' : 'Dynamic Mock Creative'}
+                    {selectedAdForPreview.imageUrl && !imageErrors[selectedAdForPreview.id] ? 'Meta Graph API Ad Creative' : 'Dynamic Mock Creative'}
                   </span>
                 </div>
                 
@@ -1150,7 +1168,7 @@ export default function CampaignsScreen() {
                   <div>
                     <p className="text-[9px] font-bold text-slate-455 uppercase tracking-wider">CPC</p>
                     <p className="font-extrabold text-indigo-700 mt-0.5 font-['JetBrains_Mono'] text-xs">
-                      {selectedAdForPreview.clicks > 0 ? `₹${(selectedAdForPreview.spend / selectedAdForPreview.clicks).toFixed(2)}` : 'N/A'}
+                      {selectedAdForPreview.clicks > 0 ? `₹${(selectedAdForPreview.spend / selectedAdForPreview.clicks).toFixed(2)}` : selectedAdForPreview.cpc ? `₹${selectedAdForPreview.cpc.toFixed(2)}` : 'N/A'}
                     </p>
                   </div>
                 </div>

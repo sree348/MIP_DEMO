@@ -23,6 +23,7 @@ import {
 import ClientBadge from '../components/shared/ClientBadge';
 import PlatformDot from '../components/shared/PlatformDot';
 import StatusBadge from '../components/shared/StatusBadge';
+import WidgetRenderer from '../components/shared/WidgetRenderer';
 import {
   formatInr, getAlerts, getConnectedPlatforms,
   getPerformanceSummary, getRecommendations,
@@ -321,13 +322,17 @@ export default function DashboardViewerScreen() {
   const [fAudience,  setFAudience]  = useState<string[]>([]);
   const [fTarget,    setFTarget]    = useState<string[]>([]);
 
-  const { selectedDashboard, setSelectedDashboard, dashboards, campaigns, integrations } = useApp();
+  const { selectedDashboard, setSelectedDashboard, dashboards, campaigns, integrations, pinnedWidgets = [], removePinnedWidget, reorderPinnedWidgets } = useApp();
   const { CLIENTS: clients } = useApp() as any;
   const queryClient = useQueryClient();
+
+  const [draggedWidgetId, setDraggedWidgetId] = useState<number | null>(null);
 
   const dashboard = dashboards.find((d: any) => d.id === selectedDashboard);
   if (!dashboard) return null;
   const client = clients?.find((c: any) => c.id === dashboard.clientId);
+
+  const currentPinnedWidgets = useMemo(() => pinnedWidgets.filter((w: any) => w.dashboardId === selectedDashboard), [pinnedWidgets, selectedDashboard]);
 
   const from = useMemo(() => new Date(monthYear.year, monthYear.month, 1), [monthYear]);
   const to   = useMemo(() => new Date(monthYear.year, monthYear.month + 1, 0, 23, 59, 59), [monthYear]);
@@ -626,6 +631,8 @@ export default function DashboardViewerScreen() {
           </button>
         )}
       </div>
+
+
 
       {/* No data banner */}
       {!campaignsLoading && ads.length === 0 && (
@@ -1082,6 +1089,65 @@ export default function DashboardViewerScreen() {
           <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-full bg-slate-400" /><span className="text-[10px] text-slate-400 font-semibold">Test / Pause</span></div>
         </div>
       </Panel>
+
+      {/* ══════════════════════════════════════════════════════════════════════
+          PINNED AI BRAIN CHARTS (DRAG AND DROP RE-ORDERABLE)
+      ══════════════════════════════════════════════════════════════════════ */}
+      {currentPinnedWidgets.length > 0 && (
+        <div className="mt-8 border-t border-slate-100 pt-6">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                <span className="size-2 bg-indigo-600 rounded-full animate-pulse" />
+                Pinned AI Brain Insights
+              </h2>
+              <p className="text-xs text-slate-400 mt-0.5">Drag and drop charts to re-order them inside your dashboard</p>
+            </div>
+            <span className="text-[10px] uppercase font-extrabold tracking-wider text-indigo-600 bg-indigo-50 px-2.5 py-0.5 rounded">
+              {currentPinnedWidgets.length} Pinned Chart{currentPinnedWidgets.length === 1 ? '' : 's'}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {currentPinnedWidgets.map((w: any) => (
+              <div
+                key={w.id}
+                draggable
+                onDragStart={(e) => {
+                  setDraggedWidgetId(w.id);
+                  e.dataTransfer.effectAllowed = "move";
+                }}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  if (draggedWidgetId !== null && draggedWidgetId !== w.id) {
+                    reorderPinnedWidgets(draggedWidgetId, w.id);
+                  }
+                }}
+                onDragEnd={() => setDraggedWidgetId(null)}
+                className={`relative group bg-white rounded-2xl border border-slate-100 shadow-sm p-1 cursor-grab active:cursor-grabbing hover:shadow-md transition-all duration-200 ${
+                  draggedWidgetId === w.id ? 'opacity-40 scale-[0.98] border-indigo-200 bg-indigo-50/5' : ''
+                }`}
+              >
+                {/* Unpin button overlay on hover */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    removePinnedWidget(w.id);
+                  }}
+                  className="absolute top-4 right-4 z-10 size-7 bg-red-50 text-red-600 border-0 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer hover:bg-red-100 shadow-sm"
+                  title="Unpin Chart"
+                >
+                  <X className="size-3.5" />
+                </button>
+                <div className="p-1 pointer-events-none">
+                  <WidgetRenderer widget={w} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
     </motion.div>
   );

@@ -75,6 +75,10 @@ interface AppContextType {
   scopedDashboards: any[];
   savedConfigs: any[];
   setSavedConfigs: (c: any[]) => void;
+  pinnedWidgets: any[];
+  addPinnedWidget: (dashboardId: number, widget: any) => void;
+  removePinnedWidget: (widgetId: number) => void;
+  reorderPinnedWidgets: (draggedId: number, targetId: number) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -90,6 +94,49 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [savedConfigs, setSavedConfigs] = useState<any[]>([
     { id: 1, name: 'CAI Mahindra — April 2026 Review', monthYear: '2026-04', filters: { platforms: ['Meta'], products: [], formats: [], audiences: [], targets: [] } }
   ]);
+
+  const [pinnedWidgets, setPinnedWidgets] = useState<any[]>(() => {
+    try {
+      const saved = window.localStorage.getItem('marketiq.pinned_widgets');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const addPinnedWidget = (dashboardId: number, widget: any) => {
+    setPinnedWidgets(prev => {
+      const updated = [...prev, { ...widget, dashboardId, pinnedAt: new Date().toISOString(), id: Date.now() }];
+      window.localStorage.setItem('marketiq.pinned_widgets', JSON.stringify(updated));
+      return updated;
+    });
+    toast.success('Chart pinned successfully!', {
+      description: `"${widget.title}" is now pinned to your dashboard.`,
+    });
+  };
+
+  const removePinnedWidget = (widgetId: number) => {
+    setPinnedWidgets(prev => {
+      const updated = prev.filter(w => w.id !== widgetId);
+      window.localStorage.setItem('marketiq.pinned_widgets', JSON.stringify(updated));
+      return updated;
+    });
+    toast.success('Chart unpinned.');
+  };
+
+  const reorderPinnedWidgets = (draggedId: number, targetId: number) => {
+    setPinnedWidgets(prev => {
+      const copy = [...prev];
+      const draggedIndex = copy.findIndex(w => w.id === draggedId);
+      const targetIndex = copy.findIndex(w => w.id === targetId);
+      if (draggedIndex !== -1 && targetIndex !== -1) {
+        const [removed] = copy.splice(draggedIndex, 1);
+        copy.splice(targetIndex, 0, removed);
+      }
+      window.localStorage.setItem('marketiq.pinned_widgets', JSON.stringify(copy));
+      return copy;
+    });
+  };
   
   const [showCampaignModal, setShowCampaignModal] = useState(false);
   const [showDashboardModal, setShowDashboardModal] = useState(false);
@@ -221,7 +268,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       scopedCampaigns,
       scopedDashboards,
       savedConfigs,
-      setSavedConfigs
+      setSavedConfigs,
+      pinnedWidgets,
+      addPinnedWidget,
+      removePinnedWidget,
+      reorderPinnedWidgets
     }}>
       {children}
     </AppContext.Provider>

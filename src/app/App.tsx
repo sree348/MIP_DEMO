@@ -39,6 +39,7 @@ import NotificationsScreen from './screens/NotificationsScreen';
 
 // Shared atoms
 import PlatformDot from './components/shared/PlatformDot';
+import MIPLogo from './components/shared/MIPLogo';
 
 type LoginProfile = {
   name: string;
@@ -170,7 +171,7 @@ function AppShell() {
                   <span className="text-slate-350 font-normal">›</span>
                 </>
               )}
-              <span className="text-slate-700 capitalize">{activeView === 'agency' ? 'Agency Overview' : activeView === 'ai' ? 'AI Analysis' : activeView.charAt(0).toUpperCase() + activeView.slice(1)}</span>
+              <span className="text-slate-700 capitalize">{activeView === 'agency' ? 'Agency Overview' : activeView === 'ai' ? 'AI Analysis' : activeView === 'ai-analysis' ? 'AI Brain' : activeView.charAt(0).toUpperCase() + activeView.slice(1)}</span>
             </div>
 
             {/* Client badge on mobile */}
@@ -366,14 +367,8 @@ function LoginScreen({ onContinue }: { onContinue: (profile: LoginProfile) => vo
       <Toaster position="top-right" richColors closeButton />
       <main className="min-h-screen grid lg:grid-cols-[1.05fr_0.95fr]">
         <section className="hidden lg:flex flex-col justify-between border-r border-slate-200 bg-white px-12 py-10">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-900 text-white shadow-sm">
-              <Zap className="h-5 w-5" />
-            </div>
-            <div>
-              <p className="font-display text-lg font-bold">MarketIQ</p>
-              <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">by Venpep</p>
-            </div>
+          <div className="flex items-center">
+            <MIPLogo className="h-10 text-slate-950" />
           </div>
 
           <div className="max-w-xl">
@@ -405,14 +400,8 @@ function LoginScreen({ onContinue }: { onContinue: (profile: LoginProfile) => vo
 
         <section className="flex min-h-screen items-center justify-center px-5 py-8 sm:px-8">
           <div className="w-full max-w-md">
-            <div className="mb-8 lg:hidden flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-900 text-white shadow-sm">
-                <Zap className="h-5 w-5" />
-              </div>
-              <div>
-                <p className="font-display text-lg font-bold">MarketIQ</p>
-                <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">by Venpep</p>
-              </div>
+            <div className="mb-8 lg:hidden flex items-center">
+              <MIPLogo className="h-10 text-slate-950" />
             </div>
 
             <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xl shadow-slate-900/5 sm:p-8">

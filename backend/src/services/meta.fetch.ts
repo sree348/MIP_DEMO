@@ -278,7 +278,7 @@ export async function fetchMetaAds(tenantId: string, adsetId: string) {
 
   const adsResponse = await axios.get(`https://graph.facebook.com/v19.0/${adsetId}/ads`, {
     params: {
-      fields: 'id,name,status,creative{id,title,body,image_url,thumbnail_url}',
+      fields: 'id,name,status,creative{id,title,body,image_url,thumbnail_url,object_story_spec,asset_feed_spec}',
       access_token: connection.accessToken,
     }
   });
@@ -302,12 +302,40 @@ export async function fetchMetaAds(tenantId: string, adsetId: string) {
       const purchaseValue = extractPurchaseValue(insights.action_values);
       const roas = conversions === 0 ? null : spend > 0 ? purchaseValue / spend : null;
 
+      const creative = ad.creative || {};
+      const objectStory = creative.object_story_spec || {};
+      const linkData = objectStory.link_data || {};
+      const videoData = objectStory.video_data || {};
+      const assetFeed = creative.asset_feed_spec || {};
+
+      const headline = 
+        creative.title || 
+        linkData.title || 
+        videoData.title || 
+        (assetFeed.ad_formats?.[0]?.title) ||
+        'Meta Ad Title';
+
+      const copy = 
+        creative.body || 
+        linkData.message || 
+        videoData.message || 
+        (assetFeed.bodies?.[0]?.text) || 
+        'Meta Ad creative copy description.';
+
+      const imageUrl = 
+        creative.image_url || 
+        creative.thumbnail_url || 
+        videoData.image_url || 
+        (assetFeed.images?.[0]?.url) ||
+        linkData.picture || 
+        null;
+
       return {
         id: ad.id,
         name: ad.name,
-        headline: ad.creative?.title || 'Meta Ad Title',
-        copy: ad.creative?.body || 'Meta Ad creative copy description.',
-        imageUrl: ad.creative?.image_url || ad.creative?.thumbnail_url || null,
+        headline,
+        copy,
+        imageUrl,
         status: ad.status.toLowerCase(),
         active: ad.status === 'ACTIVE',
         spend,
@@ -319,12 +347,40 @@ export async function fetchMetaAds(tenantId: string, adsetId: string) {
         adsetId,
       };
     } catch (e) {
+      const creative = ad.creative || {};
+      const objectStory = creative.object_story_spec || {};
+      const linkData = objectStory.link_data || {};
+      const videoData = objectStory.video_data || {};
+      const assetFeed = creative.asset_feed_spec || {};
+
+      const headline = 
+        creative.title || 
+        linkData.title || 
+        videoData.title || 
+        (assetFeed.ad_formats?.[0]?.title) ||
+        'Meta Ad Title';
+
+      const copy = 
+        creative.body || 
+        linkData.message || 
+        videoData.message || 
+        (assetFeed.bodies?.[0]?.text) || 
+        'Meta Ad creative copy description.';
+
+      const imageUrl = 
+        creative.image_url || 
+        creative.thumbnail_url || 
+        videoData.image_url || 
+        (assetFeed.images?.[0]?.url) ||
+        linkData.picture || 
+        null;
+
       return {
         id: ad.id,
         name: ad.name,
-        headline: ad.creative?.title || 'Meta Ad Title',
-        copy: ad.creative?.body || 'Meta Ad creative copy description.',
-        imageUrl: ad.creative?.image_url || ad.creative?.thumbnail_url || null,
+        headline,
+        copy,
+        imageUrl,
         status: ad.status.toLowerCase(),
         active: ad.status === 'ACTIVE',
         spend: 0,

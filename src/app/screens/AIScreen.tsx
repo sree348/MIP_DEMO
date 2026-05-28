@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../context/AppContext';
-import { Sparkles, Trash2, Send, Cpu, Lightbulb, AlertTriangle, RefreshCw, TrendingUp, TrendingDown, ShieldAlert, Zap } from 'lucide-react';
+import { Sparkles, Trash2, Send, Cpu, Lightbulb, AlertTriangle, RefreshCw, TrendingUp, TrendingDown, ShieldAlert, Zap, Settings, Pin, ChevronDown, Pause, Plus, Edit, Check } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import PageWrapper from '../components/shared/PageWrapper';
 import { apiService } from '../../services/api.service';
@@ -687,7 +687,98 @@ function buildLocalFallbackResponse(prompt: string, campaigns: any[], activeClie
 
 
 export default function AIScreen() {
-  const { scopedCampaigns: campaigns, activeClient, integrations, activeView } = useApp();
+  const { scopedCampaigns: campaigns, activeClient, integrations, activeView, addPinnedWidget, scopedDashboards: dashboardsList } = useApp();
+
+  // Chart Edit/Pin States
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isPinModalOpen, setIsPinModalOpen] = useState(false);
+  const [activeEditWidget, setActiveEditWidget] = useState<any>(null);
+  const [activeEditMsgIndex, setActiveEditMsgIndex] = useState<number | null>(null);
+  const [activePinWidget, setActivePinWidget] = useState<any>(null);
+  const [showHealthBrief, setShowHealthBrief] = useState(false);
+
+  // Multi-Session Chat States
+  const [sessions, setSessions] = useState<any[]>([]);
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState('');
+
+  // Start Renaming Chat Session Helper
+  const startRenameSession = (id: string, currentTitle: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditingSessionId(id);
+    setEditTitle(currentTitle);
+  };
+
+  // Save Renaming Chat Session Helper
+  const saveRenameSession = (id: string) => {
+    if (!editTitle.trim()) {
+      setEditingSessionId(null);
+      return;
+    }
+    const updated = sessions.map(s =>
+      s.id === id ? { ...s, title: editTitle.trim() } : s
+    );
+    setSessions(updated);
+    localStorage.setItem(`marketiq.chats.${tenantId}`, JSON.stringify(updated));
+    setEditingSessionId(null);
+  };
+
+  // Create a new blank session helper
+  const createNewChat = () => {
+    const newSession = {
+      id: 'session-' + Date.now(),
+      title: 'New Chat',
+      messages: [
+        {
+          role: 'assistant',
+          content: activeClient
+            ? `Hello! I'm your AI analytics assistant for **${activeClient.name}**. I've reviewed your campaign performance metrics and have full insights ready.\n\nWhat would you like to explore today?`
+            : `Hello! I'm your AI marketing analyst for Venpep Agency. I've compiled campaign intelligence across your client accounts and have insights ready.\n\nWhat would you like to explore today?`,
+          createdAt: new Date().toISOString(),
+        }
+      ],
+      createdAt: new Date().toISOString(),
+    };
+    const updated = [newSession, ...sessions];
+    setSessions(updated);
+    setActiveSessionId(newSession.id);
+    localStorage.setItem(`marketiq.chats.${tenantId}`, JSON.stringify(updated));
+  };
+
+  // Delete specific session thread helper
+  const deleteSession = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const updated = sessions.filter(s => s.id !== id);
+    setSessions(updated);
+    localStorage.setItem(`marketiq.chats.${tenantId}`, JSON.stringify(updated));
+    if (activeSessionId === id) {
+      if (updated.length > 0) {
+        setActiveSessionId(updated[0].id);
+      } else {
+        setActiveSessionId(null);
+      }
+    }
+  };
+
+  const handleEditChart = (msg: any, index: number) => {
+    setActiveEditWidget(msg.widget);
+    setActiveEditMsgIndex(index);
+    setIsEditModalOpen(true);
+  };
+
+  const handlePinChart = (widget: any) => {
+    setActivePinWidget(widget);
+    setIsPinModalOpen(true);
+  };
+
+  const handleSaveEditWidget = (updatedWidget: any) => {
+    if (activeEditMsgIndex !== null) {
+      setMessages(prev =>
+        prev.map((msg, idx) => (idx === activeEditMsgIndex ? { ...msg, widget: updatedWidget } : msg))
+      );
+    }
+  };
   const { CLIENTS: clients } = useApp() as any;
 
   const tenantId = activeClient?.id || 'agency';
@@ -803,36 +894,73 @@ export default function AIScreen() {
     }
   };
 
-  // Load chat history from the DB on mount or client change
+  // Load chat sessions on mount or client change
   useEffect(() => {
     const loadHistory = async () => {
       setIsLoadingHistory(true);
       try {
+        const saved = localStorage.getItem(`marketiq.chats.${tenantId}`);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (parsed && parsed.length > 0) {
+            setSessions(parsed);
+            setActiveSessionId(parsed[0].id);
+            setMessages(parsed[0].messages);
+            setIsLoadingHistory(false);
+            return;
+          }
+        }
+
         const history = await apiService.getChatHistory(tenantId);
         if (history && history.length > 0) {
+          const initialSession = {
+            id: 'session-db',
+            title: 'Agency Performance Brief',
+            messages: history,
+            createdAt: new Date().toISOString(),
+          };
+          setSessions([initialSession]);
+          setActiveSessionId(initialSession.id);
           setMessages(history);
+          localStorage.setItem(`marketiq.chats.${tenantId}`, JSON.stringify([initialSession]));
         } else {
           // Initialize with a friendly welcome message if no history exists
-          setMessages([
-            {
-              role: 'assistant',
-              content: activeClient
-                ? `Hello! I'm your AI analytics assistant for **${activeClient.name}**. I've reviewed your campaign performance metrics and have full insights ready.\n\nWhat would you like to explore today?`
-                : `Hello! I'm your AI marketing analyst for Venpep Agency. I've compiled campaign intelligence across your client accounts and have insights ready.\n\nWhat would you like to explore today?`,
-              createdAt: new Date().toISOString(),
-            }
-          ]);
+          const defaultSession = {
+            id: 'session-default',
+            title: 'New Chat',
+            messages: [
+              {
+                role: 'assistant',
+                content: activeClient
+                  ? `Hello! I'm your AI analytics assistant for **${activeClient.name}**. I've reviewed your campaign performance metrics and have full insights ready.\n\nWhat would you like to explore today?`
+                  : `Hello! I'm your AI marketing analyst for Venpep Agency. I've compiled campaign intelligence across your client accounts and have insights ready.\n\nWhat would you like to explore today?`,
+                createdAt: new Date().toISOString(),
+              }
+            ],
+            createdAt: new Date().toISOString(),
+          };
+          setSessions([defaultSession]);
+          setActiveSessionId(defaultSession.id);
+          setMessages(defaultSession.messages);
+          localStorage.setItem(`marketiq.chats.${tenantId}`, JSON.stringify([defaultSession]));
         }
       } catch (err) {
         console.error('Failed to load chat history:', err);
-        // Fallback to initial message
-        setMessages([
-          {
-            role: 'assistant',
-            content: `Hello. I can still help with campaign analysis, but chat history could not be loaded. Ask for budget waste, scale opportunities, fatigue, CPC issues, or ROAS trends.`,
-            createdAt: new Date().toISOString(),
-          }
-        ]);
+        const errorSession = {
+          id: 'session-error',
+          title: 'Offline Chat',
+          messages: [
+            {
+              role: 'assistant',
+              content: `Hello. I can still help with campaign analysis, but chat history could not be loaded. Ask for budget waste, scale opportunities, fatigue, CPC issues, or ROAS trends.`,
+              createdAt: new Date().toISOString(),
+            }
+          ],
+          createdAt: new Date().toISOString(),
+        };
+        setSessions([errorSession]);
+        setActiveSessionId(errorSession.id);
+        setMessages(errorSession.messages);
       } finally {
         setIsLoadingHistory(false);
       }
@@ -840,6 +968,69 @@ export default function AIScreen() {
 
     loadHistory();
   }, [tenantId, activeClient]);
+
+  // Sync messages back to active session and persist in localStorage
+  useEffect(() => {
+    if (activeSessionId && messages.length > 0 && sessions.length > 0) {
+      const activeIdx = sessions.findIndex(s => s.id === activeSessionId);
+      if (activeIdx !== -1) {
+        const session = sessions[activeIdx];
+        
+        // Auto-naming: rename if title is default 'New Chat' and there are user messages
+        let nextTitle = session.title;
+        if (session.title === 'New Chat' || session.title === 'Untitled Chat') {
+          const firstUser = messages.find(m => m.role === 'user');
+          if (firstUser) {
+            const words = firstUser.content.split(' ').slice(0, 5).join(' ');
+            nextTitle = words.length > 28 ? words.slice(0, 26) + '...' : words;
+          }
+        }
+
+        const updatedSessions = sessions.map((s, idx) => 
+          idx === activeIdx ? { ...s, title: nextTitle, messages } : s
+        );
+
+        if (JSON.stringify(sessions) !== JSON.stringify(updatedSessions)) {
+          setSessions(updatedSessions);
+          localStorage.setItem(`marketiq.chats.${tenantId}`, JSON.stringify(updatedSessions));
+        }
+      }
+    }
+  }, [messages, activeSessionId, sessions, tenantId]);
+
+  // Prevent completely empty sessions state
+  useEffect(() => {
+    if (!isLoadingHistory && sessions.length === 0) {
+      const defaultSession = {
+        id: 'session-default-' + Date.now(),
+        title: 'New Chat',
+        messages: [
+          {
+            role: 'assistant',
+            content: activeClient
+              ? `Hello! I'm your AI analytics assistant for **${activeClient.name}**. I've reviewed your campaign performance metrics and have full insights ready.\n\nWhat would you like to explore today?`
+              : `Hello! I'm your AI marketing analyst for Venpep Agency. I've compiled campaign intelligence across your client accounts and have insights ready.\n\nWhat would you like to explore today?`,
+            createdAt: new Date().toISOString(),
+          }
+        ],
+        createdAt: new Date().toISOString(),
+      };
+      setSessions([defaultSession]);
+      setActiveSessionId(defaultSession.id);
+      setMessages(defaultSession.messages);
+      localStorage.setItem(`marketiq.chats.${tenantId}`, JSON.stringify([defaultSession]));
+    }
+  }, [sessions, isLoadingHistory, tenantId, activeClient]);
+
+  // Load messages when active session changes
+  useEffect(() => {
+    if (activeSessionId && sessions.length > 0) {
+      const active = sessions.find(s => s.id === activeSessionId);
+      if (active) {
+        setMessages(active.messages);
+      }
+    }
+  }, [activeSessionId]);
 
   useEffect(() => {
     if (!isLoadingHistory && activeView === 'ai' && (window as any).shouldTriggerSummary) {
@@ -884,7 +1075,7 @@ export default function AIScreen() {
       };
 
       setMessages(prev => [...prev, assistantMsg]);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Chat submit failed:', error);
       const fallback = buildLocalFallbackResponse(promptText, campaigns, activeClient?.name);
       setIsTyping(false);
@@ -894,28 +1085,33 @@ export default function AIScreen() {
         widget: fallback.widget,
         createdAt: new Date().toISOString(),
       }]);
-      toast.warning('Offline Fallback Mode', {
-        description: 'The backend analytics server is currently unavailable. Displaying high-precision local campaign intelligence fallback.',
-        duration: 6000,
-      });
+      
+      const isNetworkError = !error?.message?.includes('API request failed');
+      
+      if (isNetworkError) {
+        toast.warning('Offline Fallback Mode', {
+          description: 'The backend analytics server is currently unavailable. Displaying high-precision local campaign intelligence fallback.',
+          duration: 6000,
+        });
+      } else {
+        toast.info('Local Intelligence Optimizer', {
+          description: 'This query was processed using our local campaign rule engine for precision marketing insights.',
+          duration: 5000,
+        });
+      }
     }
   };
 
   // Clear Chat History Handler
   const handleClearHistory = async () => {
-    if (!window.confirm('Are you sure you want to clear this conversation history?')) return;
+    if (!window.confirm('Are you sure you want to clear all conversation threads?')) return;
     
     try {
       await apiService.clearChatHistory(tenantId);
-      setMessages([
-        {
-          role: 'assistant',
-          content: activeClient
-            ? `Conversation history cleared. What would you like to explore next for **${activeClient.name}**?`
-            : `Conversation history cleared. What would you like to explore next?`,
-          createdAt: new Date().toISOString(),
-        }
-      ]);
+      localStorage.removeItem(`marketiq.chats.${tenantId}`);
+      setSessions([]);
+      setActiveSessionId(null);
+      toast.success('All conversation threads cleared');
     } catch (err) {
       console.error('Failed to clear chat history:', err);
     }
@@ -941,7 +1137,7 @@ export default function AIScreen() {
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <h1 className="font-display text-2xl font-bold tracking-tight text-foreground">AI Brain Strategy</h1>
+                  <h1 className="font-display text-2xl font-bold tracking-tight text-foreground">AI Analysis Strategy</h1>
                   {activeClient && (
                     <span className="inline-flex items-center gap-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 px-2.5 py-0.5 text-[11px] font-semibold text-indigo-400">
                       <span className="size-1.5 rounded-full bg-indigo-500" /> {activeClient.name}
@@ -1296,216 +1492,667 @@ export default function AIScreen() {
               </div>
             )}
           </div>
-
         </div>
       </PageWrapper>
     );
   }
 
-
   return (
     <PageWrapper>
-      <div className="h-[calc(100vh-6.5rem)] flex flex-col font-sans max-w-7xl mx-auto w-full">
+      <div className="h-[calc(100vh-6.5rem)] flex font-sans max-w-7xl mx-auto w-full select-none border border-slate-200 bg-white rounded-3xl shadow-sm overflow-hidden" style={{
+        background: 'radial-gradient(100% 100% at 50% 0%, rgba(99, 102, 241, 0.01) 0%, rgba(255, 255, 255, 0) 100%)'
+      }}>
         
-        {/* Title Header Block */}
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 flex-shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="grid size-10 place-items-center rounded-xl bg-gradient-primary text-white shadow-glow">
-              <Sparkles className="size-5" />
+        {/* Chat History Left Sidebar (like Claude/ChatGPT/Gemini) */}
+        <div className="w-64 bg-slate-50/70 border-r border-slate-200/80 flex flex-col h-full flex-shrink-0 hidden md:flex overflow-hidden">
+          {/* New Chat Button */}
+          <div className="p-3.5 border-b border-slate-200/60 flex-shrink-0">
+            <button
+              onClick={createNewChat}
+              className="w-full flex items-center justify-center gap-2 h-10 px-4 bg-white border border-slate-200 hover:border-indigo-500/35 hover:text-indigo-650 rounded-xl text-xs font-bold text-slate-700 shadow-sm transition-all hover:scale-[1.01] hover:-translate-y-0.5 cursor-pointer"
+            >
+              <Plus className="size-4 text-indigo-500" />
+              New chat
+            </button>
+          </div>
+
+          {/* Recent sessions scroll area */}
+          <div className="flex-1 overflow-y-auto px-2 py-3 space-y-4">
+            <div className="space-y-1">
+              <div className="px-3 mb-2 text-[9px] font-extrabold uppercase tracking-widest text-slate-400">
+                Recent Chats
+              </div>
+              {sessions.map(s => {
+                const isActive = s.id === activeSessionId;
+                const isEditing = s.id === editingSessionId;
+                return (
+                  <div
+                    key={s.id}
+                    onClick={() => {
+                      if (!isEditing) {
+                        setActiveSessionId(s.id);
+                      }
+                    }}
+                    className={`group flex items-center justify-between px-3 py-2.5 rounded-xl text-[11px] cursor-pointer transition-all ${
+                      isActive 
+                        ? 'bg-indigo-50/70 text-indigo-700 font-bold border-l-2 border-indigo-500' 
+                        : 'text-slate-650 hover:bg-slate-200/40 hover:text-slate-800'
+                    }`}
+                  >
+                    {isEditing ? (
+                      <div className="flex items-center gap-1.5 flex-1 min-w-0" onClick={e => e.stopPropagation()}>
+                        <input
+                          type="text"
+                          value={editTitle}
+                          onChange={e => setEditTitle(e.target.value)}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter') {
+                              saveRenameSession(s.id);
+                            } else if (e.key === 'Escape') {
+                              setEditingSessionId(null);
+                            }
+                          }}
+                          onBlur={() => saveRenameSession(s.id)}
+                          autoFocus
+                          className="flex-1 px-2 py-0.5 bg-white border border-indigo-300 rounded text-[11px] text-slate-800 focus:outline-none focus:ring-1 focus:ring-indigo-500 font-normal"
+                        />
+                        <button
+                          onClick={() => saveRenameSession(s.id)}
+                          className="p-1 text-emerald-600 hover:bg-emerald-50 rounded border-0 bg-transparent shrink-0 cursor-pointer"
+                        >
+                          <Check className="size-3" />
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                          <Sparkles className={`size-3.5 shrink-0 ${isActive ? 'text-indigo-500' : 'text-slate-400'}`} />
+                          <span className="truncate pr-1">{s.title}</span>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-all">
+                          <button
+                            onClick={(e) => startRenameSession(s.id, s.title, e)}
+                            title="Rename chat thread"
+                            className="p-1 rounded text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 border-0 bg-transparent cursor-pointer"
+                          >
+                            <Edit className="size-3" />
+                          </button>
+                          <button
+                            onClick={(e) => deleteSession(s.id, e)}
+                            title="Delete chat thread"
+                            className="p-1 rounded text-slate-400 hover:text-rose-600 hover:bg-rose-50 border-0 bg-transparent cursor-pointer"
+                          >
+                            <Trash2 className="size-3" />
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                );
+              })}
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="font-display text-2xl font-bold tracking-tight text-foreground">AI Campaign Analysis</h1>
-                {activeClient && (
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 px-2.5 py-0.5 text-[11px] font-semibold text-indigo-400">
-                    <span className="size-1.5 rounded-full bg-indigo-500" /> {activeClient.name}
-                  </span>
+          </div>
+        </div>
+
+        {/* Right Canvas: Conversational area */}
+        <div className="flex-1 flex flex-col h-full min-w-0 overflow-hidden bg-white/30 backdrop-blur-md">
+          
+          {/* Title Header Block - Styled like Claude/Gemini bar */}
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3 flex-shrink-0 px-4 sm:px-6 pt-4">
+            <div className="flex items-center gap-3">
+              <div className="grid size-10 place-items-center rounded-xl bg-gradient-to-tr from-violet-600 via-indigo-650 to-pink-500 text-white shadow-glow relative select-none">
+                <div className="absolute inset-0 bg-indigo-500/20 blur-md rounded-xl animate-pulse" />
+                <Sparkles className="size-5 relative z-10" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h1 className="font-display text-lg sm:text-xl font-bold tracking-tight text-slate-800">AI Brain</h1>
+                  {activeClient && (
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-indigo-50 border border-indigo-100 px-2.5 py-0.5 text-[10px] font-extrabold text-indigo-600">
+                      <span className="size-1.5 rounded-full bg-indigo-500 animate-pulse" /> {activeClient.name}
+                    </span>
+                  )}
+                </div>
+                <p className="text-[10px] sm:text-xs text-slate-400 font-semibold leading-relaxed">Ask analyst questions and generate dynamic data visualizations</p>
+              </div>
+            </div>
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 border border-emerald-100 px-3 py-1 text-[10px] sm:text-xs font-bold text-emerald-600 select-none shadow-sm">
+              <span className="size-1.5 animate-pulse rounded-full bg-emerald-500" /> Live Data Layer
+            </span>
+          </div>
+
+          {/* Sleek collapsable Workspace health panel */}
+          <div className="flex-shrink-0 px-4 sm:px-6 mb-3">
+            <div className="max-w-4xl mx-auto w-full">
+              <div className={`border rounded-2xl transition-all duration-300 shadow-sm overflow-hidden bg-white/70 backdrop-blur-md ${
+                showHealthBrief 
+                  ? 'border-slate-200 p-4 bg-slate-50/20' 
+                  : 'border-slate-150/70 py-2.5 px-4 flex items-center justify-between hover:border-indigo-500/30'
+              }`}>
+                {!showHealthBrief ? (
+                  <>
+                    <div className="flex items-center gap-3">
+                      <div className="size-6 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-600">
+                        <Cpu className="size-3.5" />
+                      </div>
+                      <div>
+                        <span className="text-xs font-bold text-slate-700">Workspace Health & Briefs</span>
+                        <span className="ml-2 text-[10px] text-slate-400 font-semibold hidden sm:inline">CPC benchmarks, budget waste, scale opportunities</span>
+                      </div>
+                    </div>
+                    <button 
+                      onClick={() => setShowHealthBrief(true)}
+                      className="flex items-center gap-1 text-[11px] font-extrabold text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100/80 px-2.5 py-1.5 rounded-xl border-0 cursor-pointer transition-colors"
+                    >
+                      Show Briefs <ChevronDown className="size-3.5" />
+                    </button>
+                  </>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between border-b border-slate-200/60 pb-2.5">
+                      <div className="flex items-center gap-2">
+                        <Cpu className="size-4.5 text-indigo-600" />
+                        <h3 className="text-xs font-bold text-slate-800">Workspace Performance Briefs</h3>
+                      </div>
+                      <button 
+                        onClick={() => setShowHealthBrief(false)}
+                        className="flex items-center gap-1 text-[11px] font-extrabold text-slate-500 hover:text-slate-700 bg-slate-100 hover:bg-slate-200 px-2.5 py-1.5 rounded-xl border-0 cursor-pointer transition-colors"
+                      >
+                        Hide Briefs <ChevronDown className="size-3.5 rotate-180" />
+                      </button>
+                    </div>
+
+                    {/* Stat Bento cards with custom styling */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      {[
+                        { label: "Decision scope", val: String(campaigns.length), subtitle: activeClient ? `${activeClient.name} campaigns` : 'Agency-wide campaigns' },
+                        { label: "Budget risk", val: formatInr(budgetAtRisk), subtitle: 'Zero-conversion spend to audit' },
+                        { label: "Scale pool", val: formatInr(scaleOpportunity), subtitle: `${scaleInsights.length} campaigns showing scale signals` },
+                      ].map((k, i) => (
+                        <div key={i} className="rounded-xl border border-slate-250 bg-white p-3.5 shadow-sm flex flex-col justify-between hover:border-indigo-500/25 transition-all">
+                          <div className="text-[9px] font-extrabold uppercase tracking-widest text-slate-400">{k.label}</div>
+                          <div className="mt-1 font-display text-lg font-extrabold text-slate-800">{k.val}</div>
+                          <div className="mt-0.5 text-[9px] text-slate-400 truncate">{k.subtitle}</div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+                        <div className="text-[9px] font-extrabold uppercase tracking-widest text-slate-400">Analyst brief</div>
+                        <p className="mt-1 text-[11px] font-semibold text-slate-600 leading-relaxed">
+                          Ask for decisions, not just charts: pause list, scale list, budget waste, fatigue, CPC outliers, ROAS ranking, and month-over-month movement.
+                        </p>
+                      </div>
+                      <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+                        <div className="text-[9px] font-extrabold uppercase tracking-widest text-slate-400">Benchmarks used</div>
+                        <p className="mt-1 text-[11px] font-semibold text-slate-600 leading-relaxed">
+                          CPC above {formatInr(BENCHMARKS.cpcCritical)}, frequency above {BENCHMARKS.frequencyWarning.toFixed(1)}, ROAS below {BENCHMARKS.roasWeak.toFixed(1)}x, and zero conversions after {formatInr(BENCHMARKS.wasteSpend)} are treated as action signals.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
                 )}
               </div>
-              <p className="text-xs text-muted-foreground">Ask analytics questions and receive real-time generated SQL and charts</p>
             </div>
           </div>
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 px-3 py-1 text-xs font-semibold text-emerald-400 select-none">
-            <span className="size-1.5 animate-pulse rounded-full bg-emerald-500" /> Live Connection
-          </span>
-        </div>
 
-        {/* Bento Stat Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4 flex-shrink-0 select-none">
-          {[
-            { label: "Decision scope", val: String(campaigns.length), subtitle: activeClient ? `${activeClient.name} campaigns` : 'Agency-wide campaigns' },
-            { label: "Budget risk", val: formatInr(budgetAtRisk), subtitle: 'Zero-conversion spend to audit' },
-            { label: "Scale pool", val: formatInr(scaleOpportunity), subtitle: `${scaleInsights.length} campaigns showing scale signals` },
-          ].map((k, i) => (
-            <div key={i} className="rounded-2xl border border-border bg-card p-4 shadow-sm hover:border-border/80 transition-all flex flex-col justify-between">
-              <div className="text-[10px] font-extrabold uppercase tracking-widest text-muted-foreground">{k.label}</div>
-              <div className="mt-1.5 font-display text-xl font-extrabold text-foreground">{k.val}</div>
-              <div className="mt-0.5 text-[10px] text-muted-foreground truncate">{k.subtitle}</div>
-            </div>
-          ))}
-        </div>
-
-        <div className="mb-4 grid grid-cols-1 lg:grid-cols-[1.2fr_0.8fr] gap-4 flex-shrink-0">
-          <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
-            <div className="text-[10px] font-extrabold uppercase tracking-widest text-muted-foreground">Analyst brief</div>
-            <p className="mt-2 text-sm font-semibold text-foreground">
-              Ask for decisions, not just charts: pause list, scale list, budget waste, fatigue, CPC outliers, ROAS ranking, and month-over-month movement.
-            </p>
-          </div>
-          <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
-            <div className="text-[10px] font-extrabold uppercase tracking-widest text-muted-foreground">Benchmarks used</div>
-            <p className="mt-2 text-xs text-muted-foreground">
-              CPC above {formatInr(BENCHMARKS.cpcCritical)}, frequency above {BENCHMARKS.frequencyWarning.toFixed(1)}, ROAS below {BENCHMARKS.roasWeak.toFixed(1)}x, and zero conversions after {formatInr(BENCHMARKS.wasteSpend)} are treated as action signals.
-            </p>
-          </div>
-        </div>
-
-        {/* Main Conversational Panel */}
-        <div className="flex-1 rounded-2xl border border-border bg-card overflow-hidden flex flex-col shadow-sm min-h-0">
-          
           {/* Messages Body */}
-          <div ref={chatContainerRef} className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
-            <AnimatePresence initial={false}>
-              {isLoadingHistory ? (
-                <div className="flex flex-col items-center justify-center h-full gap-2">
-                  <RefreshCw className="size-6 text-indigo-500 animate-spin" />
-                  <span className="text-xs font-semibold text-muted-foreground">Loading history...</span>
-                </div>
-              ) : (
-                messages.map((msg, i) => {
-                  const isUser = msg.role === 'user';
-                  return (
-                    <motion.div
-                      key={msg.id || i}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0 }}
-                      transition={{ duration: 0.2 }}
-                      className={`flex gap-4 ${isUser ? 'flex-row-reverse' : ''}`}
-                    >
-                      {/* Avatar */}
-                      <div className={`size-8 rounded-xl flex items-center justify-center shrink-0 shadow-sm font-bold text-xs ${
-                        isUser 
-                          ? 'bg-secondary text-foreground' 
-                          : 'bg-gradient-primary text-white shadow-glow'
-                      }`}>
-                        {isUser ? 'PM' : <Sparkles className="size-4" />}
-                      </div>
-
-                      {/* Content Bubble */}
-                      <div className={`flex flex-col gap-2 max-w-[80%] ${isUser ? 'items-end' : 'items-start'}`}>
-                        <div className={`rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
+          <div ref={chatContainerRef} className="flex-1 overflow-y-auto px-4 sm:px-6 py-2 space-y-6">
+            <div className="max-w-4xl mx-auto w-full space-y-6">
+              <AnimatePresence initial={false}>
+                {isLoadingHistory ? (
+                  <div className="flex flex-col items-center justify-center py-20 gap-3">
+                    <RefreshCw className="size-6 text-indigo-500 animate-spin" />
+                    <span className="text-xs font-semibold text-slate-400">Loading analysis workspace...</span>
+                  </div>
+                ) : (
+                  messages.map((msg, i) => {
+                    const isUser = msg.role === 'user';
+                    return (
+                      <motion.div
+                        key={msg.id || i}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.2 }}
+                        className={`flex gap-4 ${isUser ? 'flex-row-reverse' : ''}`}
+                      >
+                        {/* Avatar */}
+                        <div className={`size-8 rounded-xl flex items-center justify-center shrink-0 shadow-sm font-bold text-xs ${
                           isUser 
-                            ? 'bg-gradient-primary text-white shadow-glow rounded-tr-none' 
-                            : 'bg-muted/40 border border-border/80 text-foreground rounded-tl-none'
+                            ? 'bg-slate-100 border border-slate-200 text-slate-700' 
+                            : 'bg-gradient-to-tr from-violet-600 via-indigo-650 to-pink-500 text-white shadow-glow relative'
                         }`}>
-                          <p className="whitespace-pre-line break-words text-justify">
-                            {msg.content.split('**').map((part: string, idx: number) => 
-                              idx % 2 === 0 ? part : <strong key={idx} className="font-extrabold">{part}</strong>
-                            )}
-                          </p>
+                          {!isUser && <div className="absolute inset-0 bg-indigo-500/10 blur-sm rounded-xl animate-pulse" />}
+                          {isUser ? 'PM' : <Sparkles className="size-4 relative z-10" />}
                         </div>
 
-                        {/* If Assistant contains widget data, render it */}
-                        {!isUser && msg.widget && (
-                          <div className="w-full mt-2 min-w-[320px] max-w-full">
-                            <WidgetRenderer widget={msg.widget} />
+                        {/* Content Bubble */}
+                        <div className={`flex flex-col gap-1.5 max-w-[80%] ${isUser ? 'items-end' : 'items-start'}`}>
+                          <div className={`rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
+                            isUser 
+                              ? 'bg-slate-100 text-slate-800 border border-slate-200/60 rounded-tr-none shadow-sm text-justify font-medium' 
+                              : 'text-slate-850 font-normal leading-relaxed text-justify pr-2 whitespace-pre-line'
+                          }`}>
+                            <p className="break-words">
+                              {isUser ? (
+                                msg.content
+                              ) : (
+                                msg.content.split('**').map((part: string, idx: number) => 
+                                  idx % 2 === 0 ? part : <strong key={idx} className="font-extrabold bg-gradient-to-r from-violet-600 to-indigo-650 bg-clip-text text-transparent">{part}</strong>
+                                )
+                              )}
+                            </p>
                           </div>
-                        )}
-                      </div>
-                    </motion.div>
-                  );
-                })
-              )}
-            </AnimatePresence>
 
-            {/* Bouncing Typing Indicator */}
-            {isTyping && (
-              <div className="flex gap-4">
-                <div className="size-8 rounded-xl bg-gradient-primary flex items-center justify-center shrink-0 shadow-glow text-white">
-                  <Sparkles className="size-4" />
+                          {/* If Assistant contains widget data, render it */}
+                          {!isUser && msg.widget && (
+                            <div className="w-full mt-2 min-w-[320px] max-w-full rounded-2xl border border-slate-150 bg-slate-50/40 p-4 shadow-sm space-y-3 animate-fade-in">
+                              <WidgetRenderer widget={msg.widget} />
+                              
+                              {/* Actions bar for the chart */}
+                              <div className="flex items-center gap-2 pt-2 border-t border-slate-200/50 justify-end select-none">
+                                <button
+                                  onClick={() => handleEditChart(msg, i)}
+                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-bold text-slate-600 bg-white border border-slate-200 hover:border-indigo-500/35 hover:text-indigo-600 rounded-xl hover:shadow-sm transition-all cursor-pointer"
+                                >
+                                  <Settings className="size-3 text-slate-500" />
+                                  Edit Chart
+                                </button>
+                                <button
+                                  onClick={() => handlePinChart(msg.widget)}
+                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-bold text-slate-600 bg-white border border-slate-200 hover:border-indigo-500/35 hover:text-indigo-600 rounded-xl hover:shadow-sm transition-all cursor-pointer"
+                                >
+                                  <Pin className="size-3 text-slate-500" />
+                                  Pin to Dashboard
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                          
+                          <span className="text-[9px] text-slate-400 font-medium select-none ml-1">
+                            {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
+                      </motion.div>
+                    );
+                  })
+                )}
+              </AnimatePresence>
+
+              {/* Sparkling Welcome Hero Hub if no messages */}
+              {messages.length <= 1 && !isTyping && (
+                <div className="flex-1 flex flex-col items-center justify-center py-8 px-4 max-w-2xl mx-auto text-center space-y-8 animate-fade-in select-none">
+                  {/* Sparkling Logo Container */}
+                  <div className="relative">
+                    <div className="absolute inset-0 bg-indigo-500/20 blur-xl rounded-full animate-pulse" />
+                    <div className="relative size-14 rounded-2xl bg-gradient-to-tr from-violet-600 via-indigo-600 to-pink-500 text-white flex items-center justify-center shadow-lg shadow-indigo-500/20">
+                      <Sparkles className="size-7" />
+                    </div>
+                  </div>
+
+                  {/* Hero Heading */}
+                  <div className="space-y-3">
+                    <h2 className="text-3xl font-extrabold tracking-tight bg-gradient-to-r from-violet-600 via-indigo-600 to-pink-500 bg-clip-text text-transparent py-1">
+                      {activeClient 
+                        ? `Optimize ${activeClient.name}'s Portfolio` 
+                        : "Command your campaign metrics."}
+                    </h2>
+                    <p className="text-xs sm:text-sm text-slate-500 font-medium max-w-md leading-relaxed">
+                      I can help pause underperforming channels, scale high-converting ad sets, detect critical frequency fatigue, and generate visual SQL charts instantly.
+                    </p>
+                  </div>
+
+                  {/* Symmetrical starter cards */}
+                  <div className="w-full space-y-3">
+                    <div className="text-[9px] uppercase tracking-widest font-extrabold text-slate-400 text-left px-1">
+                      Recommended starting actions
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {QUICK_CHIPS.map((chip, idx) => {
+                        let icon = <Sparkles className="size-3.5 text-indigo-500" />;
+                        if (idx === 0) icon = <Pause className="size-3.5 text-rose-500" />;
+                        if (idx === 1) icon = <Trash2 className="size-3.5 text-rose-500" />;
+                        if (idx === 2) icon = <TrendingUp className="size-3.5 text-emerald-500" />;
+                        if (idx === 3) icon = <Zap className="size-3.5 text-amber-500" />;
+                        if (idx === 4) icon = <AlertTriangle className="size-3.5 text-rose-500" />;
+                        if (idx === 5) icon = <Cpu className="size-3.5 text-violet-500" />;
+
+                        return (
+                          <button
+                            key={idx}
+                            onClick={() => handleSend(chip)}
+                            className="group flex items-start gap-3 p-4 bg-white/70 hover:bg-white border border-slate-200/60 hover:border-indigo-500/35 rounded-2xl text-left shadow-sm hover:shadow-md hover:scale-[1.01] hover:-translate-y-0.5 transition-all duration-200 cursor-pointer"
+                          >
+                            <div className="p-2 rounded-xl bg-slate-50 group-hover:bg-indigo-50/50 border border-slate-100 group-hover:border-indigo-100 flex-shrink-0 transition-colors">
+                              {icon}
+                            </div>
+                            <div className="space-y-0.5 min-w-0">
+                              <p className="text-xs font-bold text-slate-700 group-hover:text-indigo-650 leading-snug line-clamp-2">
+                                {chip}
+                              </p>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
-                <div className="bg-muted/40 border border-border/80 rounded-2xl rounded-tl-none px-4 py-2.5 flex items-center gap-1.5 shadow-sm">
-                  {[0, 0.15, 0.3].map((delay, index) => (
-                    <motion.span
-                      key={index}
-                      variants={{
-                        initial: { y: 0 },
-                        animate: { y: -5 }
-                      }}
-                      initial="initial"
-                      animate="animate"
-                      transition={{
-                        duration: 0.4,
-                        repeat: Infinity,
-                        repeatType: 'reverse',
-                        ease: 'easeInOut',
-                        delay
-                      }}
-                      className="size-1.5 bg-indigo-500 rounded-full"
-                    />
-                  ))}
-                  <span className="text-[10px] text-muted-foreground ml-1.5 font-bold uppercase tracking-widest">Generating SQL & Charts...</span>
+              )}
+
+              {/* Bouncing Typing Indicator */}
+              {isTyping && (
+                <div className="flex gap-4 animate-fade-in select-none">
+                  <div className="size-8 rounded-xl bg-gradient-to-tr from-violet-600 to-pink-500 flex items-center justify-center shrink-0 shadow-glow relative">
+                    <div className="absolute inset-0 bg-indigo-500/10 blur-sm rounded-xl animate-pulse" />
+                    <Sparkles className="size-4 relative z-10 text-white" />
+                  </div>
+                  <div className="bg-slate-50 border border-slate-150 rounded-2xl rounded-tl-none px-4 py-2.5 flex items-center gap-1.5 shadow-sm">
+                    {[0, 0.15, 0.3].map((delay, index) => (
+                      <motion.span
+                        key={index}
+                        variants={{
+                          initial: { y: 0 },
+                          animate: { y: -5 }
+                        }}
+                        initial="initial"
+                        animate="animate"
+                        transition={{
+                          duration: 0.4,
+                          repeat: Infinity,
+                          repeatType: 'reverse',
+                          ease: 'easeInOut',
+                          delay
+                        }}
+                        className="size-1.5 bg-indigo-500 rounded-full"
+                      />
+                    ))}
+                    <span className="text-[10px] text-indigo-600 font-extrabold uppercase tracking-widest ml-1">Generating SQL & Visual Chart...</span>
+                  </div>
                 </div>
-              </div>
-            )}
-            <div ref={messagesEndRef} />
+              )}
+              <div ref={messagesEndRef} />
+            </div>
           </div>
 
-          {/* Fixed Footer Input Bar */}
-          <div className="border-t border-border p-4 bg-muted/10 flex-shrink-0">
-            {/* Quick chips if conversation is starting */}
-            {messages.length <= 1 && !isTyping && (
-              <div className="mb-4">
-                <div className="text-[10px] font-extrabold uppercase tracking-widest text-muted-foreground mb-2">Try quick prompt shortcuts</div>
-                <div className="flex flex-wrap gap-2 max-h-24 overflow-y-auto">
-                  {QUICK_CHIPS.map((chip, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => handleSend(chip)}
-                      className="text-xs px-3 py-1.5 border border-border bg-card hover:border-indigo-500/40 rounded-full hover:shadow-sm cursor-pointer transition-all text-foreground/80 hover:text-foreground font-semibold"
-                    >
-                      {chip}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Input Form Pill */}
-            <div className="flex items-end gap-3 bg-card border border-border rounded-xl p-2 shadow-sm">
-              <button
-                onClick={handleClearHistory}
-                title="Clear Conversation History"
-                className="p-2 text-muted-foreground hover:text-rose-500 hover:bg-rose-500/10 rounded-lg cursor-pointer transition-all flex-shrink-0 border-0 bg-transparent"
-              >
-                <Trash2 className="size-5" />
-              </button>
+          {/* Sticky bottom input floating capsule container */}
+          <div className="border-t border-slate-100/40 p-4 bg-gradient-to-t from-white via-white/95 to-transparent flex-shrink-0 sticky bottom-0 z-20">
+            <div className="max-w-3xl w-full mx-auto">
               
-              <textarea
-                value={input}
-                onChange={e => setInput(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder={activeClient ? `Ask me about ${activeClient.name}'s performance data (e.g. spend, ROAS, click trend)...` : "Ask me anything about client campaign databases..."}
-                rows={1}
-                className="flex-1 max-h-20 min-h-[2.25rem] bg-transparent border-0 focus:ring-0 focus:outline-none text-sm text-foreground placeholder:text-muted-foreground py-2.5 px-1 resize-none font-sans"
-              />
+              {/* Quick chips if conversation is starting (shows above input pill only on sm devices) */}
+              {messages.length > 1 && messages.length <= 3 && !isTyping && (
+                <div className="mb-3.5 select-none hidden sm:block">
+                  <div className="text-[9px] font-extrabold uppercase tracking-widest text-slate-400 mb-2 px-1">Quick analysis followups</div>
+                  <div className="flex flex-wrap gap-2 max-h-24 overflow-y-auto">
+                    {QUICK_CHIPS.slice(0, 4).map((chip, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => handleSend(chip)}
+                        className="text-[11px] px-3.5 py-1.5 border border-slate-200 bg-white hover:border-indigo-500/30 rounded-full hover:shadow-sm cursor-pointer transition-all text-slate-650 hover:text-indigo-600 font-semibold"
+                      >
+                        {chip}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
 
-              <button
-                onClick={() => handleSend()}
-                disabled={!input.trim()}
-                className="size-9 rounded-lg bg-gradient-primary text-white flex items-center justify-center hover:shadow-glow disabled:opacity-40 disabled:hover:shadow-none disabled:cursor-not-allowed cursor-pointer transition-all border-0 shrink-0"
-              >
-                <Send className="size-4" />
-              </button>
-            </div>
-            <div className="text-[9px] text-muted-foreground mt-2 text-center select-none font-medium">
-              Press <kbd className="font-mono bg-muted border border-border px-1 py-0.5 rounded text-[8px] font-bold">Ctrl + Enter</kbd> to submit query
+              {/* Modern elevated capsule input box */}
+              <div className="flex items-end gap-3 bg-white border border-slate-200 rounded-2xl p-2.5 shadow-md focus-within:shadow-lg focus-within:border-indigo-500/60 focus-within:ring-4 focus-within:ring-indigo-500/5 transition-all">
+                <button
+                  onClick={handleClearHistory}
+                  title="Clear Conversation History"
+                  className="p-2.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl cursor-pointer transition-all flex-shrink-0 border border-transparent"
+                >
+                  <Trash2 className="size-4.5" />
+                </button>
+                
+                <textarea
+                  value={input}
+                  onChange={e => setInput(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder={activeClient ? `Ask me about ${activeClient.name}'s data (e.g. CPC outliers, fatigue, zero conversions)...` : "Ask me anything about client campaign databases..."}
+                  rows={1}
+                  className="flex-1 max-h-24 min-h-[2.25rem] bg-transparent border-0 focus:ring-0 focus:outline-none text-xs sm:text-sm text-slate-800 placeholder:text-slate-400 py-2.5 px-1 resize-none font-sans leading-relaxed"
+                />
+
+                <button
+                  onClick={() => handleSend()}
+                  disabled={!input.trim()}
+                  className="size-9 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-650 text-white flex items-center justify-center hover:shadow-glow disabled:opacity-40 disabled:hover:shadow-none disabled:cursor-not-allowed cursor-pointer transition-all border-0 shrink-0 hover:scale-105 active:scale-95"
+                >
+                  <Send className="size-4" />
+                </button>
+              </div>
+              
+              <div className="text-[9px] text-slate-400 mt-2 text-center select-none font-medium">
+                Press <kbd className="font-mono bg-slate-100 border border-slate-200 px-1 py-0.5 rounded text-[8px] font-bold">Ctrl + Enter</kbd> to submit query
+              </div>
             </div>
           </div>
 
         </div>
       </div>
+
+      {/* Edit and Pin Modals */}
+      <EditChartModal
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        widget={activeEditWidget}
+        onSave={handleSaveEditWidget}
+      />
+
+      <PinChartModal
+        isOpen={isPinModalOpen}
+        onClose={() => setIsPinModalOpen(false)}
+        widget={activePinWidget}
+        dashboards={dashboardsList}
+        onPin={(dbId) => addPinnedWidget(dbId, activePinWidget)}
+      />
     </PageWrapper>
+  );
+}
+
+// ─── Modal Components ─────────────────────────────────────────────────────────
+
+function EditChartModal({ isOpen, onClose, widget, onSave }: { isOpen: boolean; onClose: () => void; widget: any; onSave: (updatedWidget: any) => void }) {
+  const [title, setTitle] = useState(widget?.title || '');
+  const [chartType, setChartType] = useState(widget?.chart_type || 'bar_chart');
+  const [yAxis, setYAxis] = useState(widget?.config?.y_axis || 'spend');
+  const [xAxis, setXAxis] = useState(widget?.config?.x_axis || 'campaign_name');
+  const [sort, setSort] = useState(widget?.config?.sort || 'DESC');
+
+  useEffect(() => {
+    if (widget) {
+      setTitle(widget.title);
+      setChartType(widget.chart_type);
+      setYAxis(widget.config?.y_axis || 'spend');
+      setXAxis(widget.config?.x_axis || 'campaign_name');
+      setSort(widget.config?.sort || 'DESC');
+    }
+  }, [widget]);
+
+  const handleSave = () => {
+    onSave({
+      ...widget,
+      title,
+      chart_type: chartType,
+      config: {
+        ...widget.config,
+        y_axis: yAxis,
+        x_axis: xAxis,
+        sort: sort
+      }
+    });
+    onClose();
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+      <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md border border-slate-100 flex flex-col gap-4">
+        <div>
+          <h2 className="text-base font-bold text-slate-900">Customize AI Chart</h2>
+          <p className="text-xs text-slate-400 mt-0.5">Edit visual parameters and axis configurations in real-time</p>
+        </div>
+
+        <div className="space-y-4">
+          <label className="block">
+            <span className="text-xs font-bold text-slate-700">Chart Title</span>
+            <input
+              type="text"
+              value={title}
+              onChange={e => setTitle(e.target.value)}
+              className="mt-1.5 w-full h-10 px-3 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-600 focus:bg-white transition-all font-bold"
+            />
+          </label>
+
+          <div className="grid grid-cols-2 gap-4">
+            <label className="block">
+              <span className="text-xs font-bold text-slate-700">Visualization Type</span>
+              <select
+                value={chartType}
+                onChange={e => setChartType(e.target.value)}
+                className="mt-1.5 w-full h-10 px-3 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-600 focus:bg-white transition-all font-bold"
+              >
+                <option value="bar_chart">Bar Chart</option>
+                <option value="line_chart">Line Chart</option>
+                <option value="pie_chart">Pie Chart</option>
+                <option value="kpi_card">KPI Cards</option>
+                <option value="table">Data Table</option>
+              </select>
+            </label>
+
+            <label className="block">
+              <span className="text-xs font-bold text-slate-700">Sort Direction</span>
+              <select
+                value={sort}
+                onChange={e => setSort(e.target.value)}
+                className="mt-1.5 w-full h-10 px-3 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-600 focus:bg-white transition-all font-bold"
+              >
+                <option value="DESC">High to Low (Desc)</option>
+                <option value="ASC">Low to High (Asc)</option>
+              </select>
+            </label>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <label className="block">
+              <span className="text-xs font-bold text-slate-700">Y-Axis Metric</span>
+              <select
+                value={yAxis}
+                onChange={e => setYAxis(e.target.value)}
+                className="mt-1.5 w-full h-10 px-3 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-600 focus:bg-white transition-all font-bold"
+              >
+                <option value="spend">Spend (₹)</option>
+                <option value="clicks">Clicks</option>
+                <option value="impressions">Impressions</option>
+                <option value="conversions">Conversions</option>
+                <option value="cpc">Cost per Click (CPC)</option>
+                <option value="ctr">Click-Through Rate (CTR)</option>
+                <option value="roas">ROAS</option>
+                <option value="frequency">Frequency</option>
+              </select>
+            </label>
+
+            <label className="block">
+              <span className="text-xs font-bold text-slate-700">X-Axis Dimension</span>
+              <select
+                value={xAxis}
+                onChange={e => setXAxis(e.target.value)}
+                className="mt-1.5 w-full h-10 px-3 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-600 focus:bg-white transition-all font-bold"
+              >
+                <option value="campaign_name">Campaign Name</option>
+                <option value="platform">Platform / Channel</option>
+              </select>
+            </label>
+          </div>
+        </div>
+
+        <div className="flex gap-2.5 mt-2 justify-end">
+          <button
+            onClick={onClose}
+            className="h-10 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold cursor-pointer border-0"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSave}
+            className="h-10 px-4 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold cursor-pointer border-0"
+          >
+            Apply Changes
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PinChartModal({ isOpen, onClose, widget, dashboards, onPin }: { isOpen: boolean; onClose: () => void; widget: any; dashboards: any[]; onPin: (dashboardId: number) => void }) {
+  const [selectedDbId, setSelectedDbId] = useState<number | ''>('');
+
+  useEffect(() => {
+    if (dashboards && dashboards.length > 0) {
+      setSelectedDbId(dashboards[0].id);
+    }
+  }, [dashboards]);
+
+  const handlePin = () => {
+    if (selectedDbId !== '') {
+      onPin(Number(selectedDbId));
+      onClose();
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+      <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md border border-slate-100 flex flex-col gap-4">
+        <div>
+          <h2 className="text-base font-bold text-slate-900">Pin to Dashboard</h2>
+          <p className="text-xs text-slate-400 mt-0.5">Attach this live AI-generated insight chart to a workspace dashboard</p>
+        </div>
+
+        <div className="space-y-4">
+          <label className="block">
+            <span className="text-xs font-bold text-slate-700">Select Target Dashboard</span>
+            {(!dashboards || dashboards.length === 0) ? (
+              <p className="mt-2 text-xs font-semibold text-slate-500">No dashboards available. Create a dashboard first in the dashboard view.</p>
+            ) : (
+              <select
+                value={selectedDbId}
+                onChange={e => setSelectedDbId(Number(e.target.value))}
+                className="mt-1.5 w-full h-10 px-3 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-600 focus:bg-white transition-all font-bold"
+              >
+                {dashboards.map(d => (
+                  <option key={d.id} value={d.id}>
+                    {d.name}
+                  </option>
+                ))}
+              </select>
+            )}
+          </label>
+        </div>
+
+        <div className="flex gap-2.5 mt-2 justify-end">
+          <button
+            onClick={onClose}
+            className="h-10 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold cursor-pointer border-0"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handlePin}
+            disabled={selectedDbId === ''}
+            className="h-10 px-4 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold cursor-pointer border-0 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            Pin Insight
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }

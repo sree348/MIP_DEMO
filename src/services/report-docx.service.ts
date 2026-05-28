@@ -66,16 +66,19 @@ export async function downloadReportDocx({ report, client, campaigns, integratio
                   cell('Status', true),
                 ],
               }),
-              ...campaigns.map((campaign: any) => new TableRow({
-                children: [
-                  cell(campaign.name),
-                  cell(campaign.channel),
-                  cell(formatInr(campaign.spend)),
-                  cell(`${campaign.ctr}%`),
-                  cell(campaign.cpc === null || campaign.cpc === undefined ? 'N/A' : `₹${campaign.cpc.toFixed(2)}`),
-                  cell(campaign.status),
-                ],
-              })),
+              ...campaigns.map((campaign: any) => {
+                const campaignCpc = campaign.clicks > 0 ? campaign.spend / campaign.clicks : campaign.cpc;
+                return new TableRow({
+                  children: [
+                    cell(campaign.name),
+                    cell(campaign.channel),
+                    cell(formatInr(campaign.spend)),
+                    cell(`${campaign.ctr}%`),
+                    cell(campaignCpc === null || campaignCpc === undefined || campaignCpc === 0 ? 'N/A' : `₹${campaignCpc.toFixed(2)}`),
+                    cell(campaign.status),
+                  ],
+                });
+              }),
             ],
           }),
           new Paragraph({ text: 'Alerts', heading: HeadingLevel.HEADING_1 }),

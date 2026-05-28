@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import NavLink from './shared/NavLink';
+import MIPLogo from './shared/MIPLogo';
 
 export default function Sidebar({ onClose }: { onClose?: () => void }) {
   const {
@@ -25,8 +26,8 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
   const navItems = [
     { id: 'agency', icon: <LayoutDashboard className="w-4 h-4" />, label: 'Agency Overview' },
     { id: 'clients', icon: <Users className="w-4 h-4" />, label: 'Clients', count: 1 },
-    { id: 'ai', icon: <Cpu className="w-4 h-4" />, label: 'AI Brain', badge: 'New' },
-    { id: 'ai-analysis', icon: <Sparkles className="w-4 h-4" />, label: 'AI Analysis', badge: integrations.some((i: any) => i.connected) ? '● Live' : undefined },
+    { id: 'ai', icon: <Cpu className="w-4 h-4" />, label: 'AI Analysis', badge: 'New' },
+    { id: 'ai-analysis', icon: <Sparkles className="w-4 h-4" />, label: 'AI Brain', badge: integrations.some((i: any) => i.connected) ? '● Live' : undefined },
     { id: 'dashboards', icon: <BarChart3 className="w-4 h-4" />, label: 'Dashboards' },
     { id: 'campaigns', icon: <Target className="w-4 h-4" />, label: 'Campaigns', count: 13 },
     { id: 'analytics', icon: <BarChart3 className="w-4 h-4" />, label: 'Analytics' },
@@ -55,14 +56,8 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
     <div className="flex h-full flex-col bg-surface overflow-hidden">
       {/* Brand Header */}
       <div className="flex items-center justify-between border-b border-border px-5 py-4 flex-shrink-0">
-        <div className="flex items-center gap-3">
-          <div className="flex size-10 items-center justify-center rounded-xl bg-gradient-primary font-display text-base font-extrabold text-white shadow-glow">
-            <Zap className="w-5 h-5 text-white" />
-          </div>
-          <div>
-            <div className="font-display text-base font-bold">MarketIQ</div>
-            <div className="text-[9px] uppercase tracking-widest text-muted-foreground">by Venpep</div>
-          </div>
+        <div className="flex items-center">
+          <MIPLogo className="h-9 text-slate-900 dark:text-white" />
         </div>
         {onClose && (
           <button onClick={onClose} className="w-7 h-7 rounded-lg hover:bg-secondary flex items-center justify-center cursor-pointer border-0 bg-transparent">
