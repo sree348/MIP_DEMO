@@ -92,6 +92,10 @@ app.use((error: Error, _req: express.Request, res: express.Response, _next: expr
 initializeMetaConnectionFromEnv();
 startMetaSyncJob();
 
-httpServer.listen(port, () => {
-  console.log(`MIP backend listening on http://localhost:${port}`);
-});
+if (process.env.NODE_ENV !== 'production') {
+  httpServer.listen(port, () => {
+    console.log(`MIP backend listening on http://localhost:${port}`);
+  });
+}
+
+export { app };
