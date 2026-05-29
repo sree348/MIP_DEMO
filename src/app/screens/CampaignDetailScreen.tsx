@@ -80,7 +80,7 @@ export default function CampaignDetailScreen() {
       <div className="bg-white rounded-2xl border border-slate-200 p-4 mb-4 shadow-sm">
         <div className="flex items-center justify-between mb-2">
           <p className="text-xs font-bold text-slate-700">Budget Utilization</p>
-          <p className="text-xs font-bold font-['JetBrains_Mono'] text-slate-900">${(campaign.spend / 1000).toFixed(1)}k / ${(campaign.budget / 1000).toFixed(0)}k</p>
+          <p className="text-xs font-bold font-['JetBrains_Mono'] text-slate-900">₹{(campaign.spend / 1000).toFixed(1)}k / ₹{(campaign.budget / 1000).toFixed(0)}k</p>
         </div>
         <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden">
           <motion.div initial={{ width: 0 }} animate={{ width: `${budgetPct}%` }} transition={{ duration: 0.7 }} className={`h-full rounded-full ${budgetPct > 90 ? 'bg-red-500' : budgetPct > 70 ? 'bg-amber-500' : 'bg-emerald-500'}`} />
@@ -91,9 +91,9 @@ export default function CampaignDetailScreen() {
       {/* KPIs */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-5">
         {[
-          { label: 'Spend', value: `$${(campaign.spend / 1000).toFixed(1)}k`, sub: `Budget: $${(campaign.budget / 1000).toFixed(0)}k`, color: 'text-slate-900' },
+          { label: 'Spend', value: `₹${(campaign.spend / 1000).toFixed(1)}k`, sub: `Budget: ₹${(campaign.budget / 1000).toFixed(0)}k`, color: 'text-slate-900' },
           { label: 'CPC', value: cpc > 0 ? `₹${cpc.toFixed(2)}` : 'N/A', sub: `CTR: ${campaign.ctr}%`, color: 'text-slate-900' },
-          { label: 'Conversions', value: campaign.conv.toLocaleString(), sub: `$${(campaign.spend / campaign.conv).toFixed(0)} CPA`, color: 'text-slate-900' },
+          { label: 'Conversions', value: campaign.conv.toLocaleString(), sub: `₹${(campaign.spend / campaign.conv).toFixed(0)} CPA`, color: 'text-slate-900' },
           { label: 'CTR', value: `${campaign.ctr}%`, sub: `Avg: ${(campaign.ctr - 0.2).toFixed(2)}%`, color: 'text-slate-900' },
           { label: 'Impressions', value: `${(campaign.impressions / 1000).toFixed(0)}k`, sub: `${campaign.clicks.toLocaleString()} clicks`, color: 'text-slate-900' },
           { label: 'Frequency', value: `${campaign.frequency || 0}×`, sub: campaign.frequency > 5 ? '⚠ Too high' : 'Healthy', color: campaign.frequency > 5 ? 'text-red-600' : 'text-slate-900' },
@@ -152,7 +152,7 @@ export default function CampaignDetailScreen() {
             </defs>
             <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
             <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
-            <YAxis tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} tickFormatter={v => `$${(v / 1000).toFixed(0)}k`} />
+            <YAxis tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} tickFormatter={v => `₹${(v / 1000).toFixed(0)}k`} />
             <Tooltip contentStyle={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, fontSize: 11 }} />
             <Area type="monotone" dataKey="spend" stroke="#0f172a" strokeWidth={2} fill="url(#cdGrad)" dot={false} />
           </AreaChart>
@@ -167,7 +167,7 @@ export default function CampaignDetailScreen() {
               <div key={i} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl">
                 <div>
                   <p className="text-xs font-semibold">{adset}</p>
-                  <p className="text-[10px] text-slate-400">${(campaign.spend / 3 * (1 - i * 0.2)).toFixed(0)} spend</p>
+                  <p className="text-[10px] text-slate-400">₹{(campaign.spend / 3 * (1 - i * 0.2)).toFixed(0)} spend</p>
                 </div>
                 <div className="text-right">
                   <p className="text-xs font-bold text-emerald-600 font-['JetBrains_Mono']">₹{(cpc * (1 + (i - 1) * 0.15)).toFixed(2)} CPC</p>

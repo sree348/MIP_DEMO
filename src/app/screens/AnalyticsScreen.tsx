@@ -1,5 +1,5 @@
 import { useApp } from '../context/AppContext';
-import { Download, DollarSign, TrendingUp, CheckCircle, Activity } from 'lucide-react';
+import { Download, IndianRupee, TrendingUp, CheckCircle, Activity } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, Cell, PieChart, Pie, AreaChart, Area, CartesianGrid, XAxis, YAxis, Tooltip } from 'recharts';
 import PageWrapper from '../components/shared/PageWrapper';
 import MetricCard from '../components/shared/MetricCard';
@@ -52,7 +52,7 @@ export default function AnalyticsScreen() {
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
-          { icon: <DollarSign className="w-4 h-4" />, label: 'Total Spend', value: `$${(totalSpend/1000).toFixed(1)}k`, change: '+12.4%', pos: true, color: 'blue' },
+          { icon: <IndianRupee className="w-4 h-4" />, label: 'Total Spend', value: `₹${(totalSpend/1000).toFixed(1)}k`, change: '+12.4%', pos: true, color: 'blue' },
           { icon: <TrendingUp className="w-4 h-4" />, label: 'Avg ROAS', value: `${avgRoas.toFixed(1)}×`, change: '+8.2%', pos: true, color: 'emerald' },
           { icon: <CheckCircle className="w-4 h-4" />, label: 'Conversions', value: totalConv.toLocaleString(), change: '+18.3%', pos: true, color: 'violet' },
           { icon: <Activity className="w-4 h-4" />, label: 'Active Campaigns', value: campaigns.filter((c: any) => c.active).length, color: 'amber' },
@@ -67,8 +67,8 @@ export default function AnalyticsScreen() {
             <BarChart data={platformBarData} margin={{ top: 0, right: 5, left: -20, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
               <XAxis dataKey="platform" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} tickFormatter={v => `$${(v/1000).toFixed(0)}k`} />
-              <Tooltip contentStyle={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, fontSize: 11 }} formatter={(v: any) => [`$${(v/1000).toFixed(1)}k`, 'Spend']} />
+              <YAxis tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} tickFormatter={v => `₹${(v/1000).toFixed(0)}k`} />
+              <Tooltip contentStyle={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, fontSize: 11 }} formatter={(v: any) => [`₹${(v/1000).toFixed(1)}k`, 'Spend']} />
               <Bar dataKey="spend" radius={[6, 6, 0, 0]}>
                 {platformBarData.map((e, i) => <Cell key={i} fill={e.color} />)}
               </Bar>
@@ -119,7 +119,7 @@ export default function AnalyticsScreen() {
             </defs>
             <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
             <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
-            <YAxis tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} tickFormatter={v => `$${(v / 1000).toFixed(0)}k`} />
+            <YAxis tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} tickFormatter={v => `₹${(v / 1000).toFixed(0)}k`} />
             <Tooltip contentStyle={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, fontSize: 11 }} />
             <Area type="monotone" dataKey="spend" stroke="#0f172a" strokeWidth={2} fill="url(#aGrad)" dot={false} />
           </AreaChart>

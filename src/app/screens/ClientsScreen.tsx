@@ -70,7 +70,7 @@ export default function ClientsScreen() {
             </div>
             <div className="grid grid-cols-4 gap-3">
               {[
-                { k: 'Ad Spend', v: `$${(spend / 1000).toFixed(1)}k` },
+                { k: 'Ad Spend', v: `₹${(spend / 1000).toFixed(1)}k` },
                 { k: 'Avg CPC', v: `₹${avgCpc.toFixed(2)}` },
                 { k: 'Conversions', v: conv },
                 { k: 'Campaigns', v: cc.length },
@@ -91,7 +91,7 @@ export default function ClientsScreen() {
             {[
               { k: 'Account Manager', v: activeClient.accountManager },
               { k: 'Industry', v: activeClient.industry },
-              { k: 'Monthly Budget', v: `$${(activeClient.monthlyBudget / 1000).toFixed(0)}k` },
+              { k: 'Monthly Budget', v: `₹${(activeClient.monthlyBudget / 1000).toFixed(0)}k` },
               { k: 'Retainer', v: activeClient.retainer },
               { k: 'Client Since', v: activeClient.since },
               { k: 'Status', v: activeClient.status.charAt(0).toUpperCase() + activeClient.status.slice(1) },
@@ -184,7 +184,7 @@ export default function ClientsScreen() {
 
                 <div className="grid grid-cols-4 gap-2.5 mb-4">
                   {[
-                    { k: 'Spend', v: `$${(spend / 1000).toFixed(1)}k` },
+                    { k: 'Spend', v: `₹${(spend / 1000).toFixed(1)}k` },
                     { k: 'Avg CPC', v: `₹${avgCpc.toFixed(2)}` },
                     { k: 'Campaigns', v: cc.length },
                     { k: 'Dashboards', v: cd.length },

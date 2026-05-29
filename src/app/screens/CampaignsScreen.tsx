@@ -163,7 +163,16 @@ export default function CampaignsScreen() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'paused' | 'draft' | 'inactive'>('all');
   const [selectedMonth, setSelectedMonth] = useState<string>('all');
   const [showCalendarDropdown, setShowCalendarDropdown] = useState(false);
-  const [selectedRangeLabel, setSelectedRangeLabel] = useState('All Months');
+  const [selectedRangeLabel, setSelectedRangeLabel] = useState('1 May 2026 - 25 May 2026');
+
+  // Advanced Meta-style Date Range Picker States
+  const [startDate, setStartDate] = useState<string>('2026-05-01');
+  const [endDate, setEndDate] = useState<string>('2026-05-25');
+  const [tempStartDate, setTempStartDate] = useState<string>('2026-05-01');
+  const [tempEndDate, setTempEndDate] = useState<string>('2026-05-25');
+  const [selectedPreset, setSelectedPreset] = useState<string>('custom');
+  const [compareEnabled, setCompareEnabled] = useState<boolean>(false);
+  const [comparePreset, setComparePreset] = useState<string>('previous_period');
 
   // ═══════════════════════════════════════════════════════════════════════════════
   // GENERATE DYNAMIC AD SETS & ADS ACROSS SYNCHRONIZED METRICS (MOCK MODE ONLY)
@@ -239,10 +248,10 @@ export default function CampaignsScreen() {
         if (statusFilter === 'draft') return c.status === 'draft';
         if (statusFilter === 'inactive') return !c.active || c.status !== 'active';
       }
-      // Month filter
-      if (selectedMonth && selectedMonth !== 'all') {
-        const [y, m] = selectedMonth.split('-').map(Number);
-        return c.month === m && c.year === y;
+      // Meta-style Custom Date Range Filter
+      if (startDate && endDate) {
+        const cDate = c.start_date || `${c.year}-${String(c.month).padStart(2, '0')}-15`;
+        return cDate >= startDate && cDate <= endDate;
       }
       return true;
     })
@@ -632,73 +641,240 @@ export default function CampaignsScreen() {
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: 8 }}
-                  className="absolute right-0 top-11 bg-white border border-slate-200 rounded-2xl shadow-xl p-4 w-72 z-50 flex flex-col gap-3.5"
+                  className="absolute right-0 top-11 bg-white border border-slate-200 rounded-2xl shadow-2xl p-0 w-[720px] z-50 flex font-sans overflow-hidden text-slate-800"
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <p className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">
-                    Select Date Range
-                  </p>
-                  
-                  {/* Presets Grid */}
-                  <div className="grid grid-cols-2 gap-1.5">
-                    {[
-                      { id: 'all', label: 'All Months' },
-                      { id: '2026-05', label: 'May 2026' },
-                      { id: '2026-04', label: 'April 2026' },
-                      { id: '2026-03', label: 'March 2026' },
-                      { id: '2026-02', label: 'February 2026' },
-                    ].map(preset => (
-                      <button
-                        key={preset.id}
-                        onClick={() => {
-                          setSelectedMonth(preset.id);
-                          setSelectedRangeLabel(preset.label);
-                          setShowCalendarDropdown(false);
-                          toast.success(`Filtering for ${preset.label}`);
-                        }}
-                        className={`px-3 py-2 rounded-lg text-[11px] font-bold border ${selectedMonth === preset.id ? 'bg-indigo-600 text-white border-indigo-700' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'}`}
-                      >
-                        {preset.label}
-                      </button>
-                    ))}
+                  {/* Left Sidebar: Presets */}
+                  <div className="w-[180px] border-r border-slate-100 flex flex-col p-3 bg-slate-50/50 justify-between select-none">
+                    <div className="flex flex-col gap-1">
+                      {[
+                        { id: 'today', label: 'Today', start: '2026-05-29', end: '2026-05-29' },
+                        { id: 'yesterday', label: 'Yesterday', start: '2026-05-28', end: '2026-05-28' },
+                        { id: 'today_yesterday', label: 'Today and yesterday', start: '2026-05-28', end: '2026-05-29' },
+                        { id: 'last_7_days', label: 'Last 7 days', start: '2026-05-22', end: '2026-05-28' },
+                        { id: 'last_14_days', label: 'Last 14 days', start: '2026-05-15', end: '2026-05-28' },
+                        { id: 'last_28_days', label: 'Last 28 days', start: '2026-05-01', end: '2026-05-28' },
+                        { id: 'last_30_days', label: 'Last 30 days', start: '2026-04-29', end: '2026-05-28' },
+                        { id: 'this_week', label: 'This week', start: '2026-05-24', end: '2026-05-29' },
+                        { id: 'last_week', label: 'Last week', start: '2026-05-17', end: '2026-05-23' },
+                        { id: 'this_month', label: 'This month', start: '2026-05-01', end: '2026-05-31' },
+                        { id: 'last_month', label: 'Last month', start: '2026-04-01', end: '2026-04-30' },
+                        { id: 'maximum', label: 'Maximum', start: '2026-01-01', end: '2026-05-29' },
+                        { id: 'custom', label: 'Custom' },
+                      ].map(preset => (
+                        <button
+                          key={preset.id}
+                          onClick={() => {
+                            setSelectedPreset(preset.id);
+                            if (preset.id !== 'custom' && preset.start && preset.end) {
+                              setTempStartDate(preset.start);
+                              setTempEndDate(preset.end);
+                            }
+                          }}
+                          className="flex items-center gap-2 py-1 px-1.5 rounded-lg text-[11px] font-semibold text-slate-700 hover:bg-slate-100 transition-colors border-0 bg-transparent cursor-pointer text-left w-full"
+                        >
+                          <span className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center flex-shrink-0 ${selectedPreset === preset.id ? 'border-blue-500 bg-white' : 'border-slate-350 bg-white'}`}>
+                            {selectedPreset === preset.id && <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />}
+                          </span>
+                          <span className={`${selectedPreset === preset.id ? 'font-bold text-blue-600' : ''}`}>{preset.label}</span>
+                        </button>
+                      ))}
+                    </div>
                   </div>
 
-                  <div className="w-full h-px bg-slate-100" />
-
-                  {/* Custom Date Picker inputs */}
-                  <div className="flex flex-col gap-2">
-                    <p className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">
-                      Custom Range
-                    </p>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div className="flex flex-col gap-1">
-                        <span className="text-[9px] font-bold text-slate-455">Start Date</span>
-                        <input
-                          type="date"
-                          defaultValue="2026-01-01"
-                          className="h-8 border border-slate-200 rounded-lg px-2 text-[11px] font-bold text-slate-700 focus:outline-indigo-650 w-full"
-                        />
+                  {/* Right Content: Dual Calendars + Footer */}
+                  <div className="flex-1 flex flex-col p-4">
+                    {/* Calendars header */}
+                    <div className="flex items-center justify-between text-xs font-bold text-slate-800 mb-2 border-b border-slate-100 pb-2">
+                      <div className="flex items-center gap-1.5">
+                        <ChevronRight className="w-3.5 h-3.5 rotate-180 text-slate-400 cursor-pointer hover:text-slate-700 animate-none bg-transparent border-0" />
+                        <span>May 2026</span>
                       </div>
-                      <div className="flex flex-col gap-1">
-                        <span className="text-[9px] font-bold text-slate-455">End Date</span>
-                        <input
-                          type="date"
-                          defaultValue="2026-05-26"
-                          className="h-8 border border-slate-200 rounded-lg px-2 text-[11px] font-bold text-slate-700 focus:outline-indigo-650 w-full"
-                        />
+                      <div className="flex items-center gap-1.5">
+                        <span>June 2026</span>
+                        <ChevronRight className="w-3.5 h-3.5 text-slate-400 cursor-pointer hover:text-slate-700 animate-none bg-transparent border-0" />
                       </div>
                     </div>
-                    <button
-                      onClick={() => {
-                        setSelectedMonth('all');
-                        setSelectedRangeLabel('All Months');
-                        setShowCalendarDropdown(false);
-                        toast.success('Month filter reset');
-                      }}
-                      className="h-8 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 transition-all cursor-pointer border-0 mt-1 shadow-sm"
-                    >
-                      Reset Month Filter
-                    </button>
+
+                    {/* Dual Grids */}
+                    <div className="grid grid-cols-2 gap-6 select-none">
+                      {/* May 2026 Calendar starting Friday */}
+                      <div>
+                        <div className="grid grid-cols-7 text-center text-[10px] font-bold text-slate-400 mb-1">
+                          {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => <span key={d}>{d}</span>)}
+                        </div>
+                        <div className="grid grid-cols-7 gap-y-1 text-center text-[11px] font-bold">
+                          {[
+                            null, null, null, null, 1, 2,
+                            3, 4, 5, 6, 7, 8, 9,
+                            10, 11, 12, 13, 14, 15, 16,
+                            17, 18, 19, 20, 21, 22, 23,
+                            24, 25, 26, 27, 28, 29, 30,
+                            31
+                          ].map((day, idx) => {
+                            if (day === null) return <span key={`empty-may-${idx}`} />;
+                            const dateStr = `2026-05-${String(day).padStart(2, '0')}`;
+                            const isSelectedStart = tempStartDate === dateStr;
+                            const isSelectedEnd = tempEndDate === dateStr;
+                            const isInRange = tempStartDate && tempEndDate && dateStr >= tempStartDate && dateStr <= tempEndDate;
+
+                            return (
+                              <button
+                                key={`may-${day}`}
+                                onClick={() => {
+                                  setSelectedPreset('custom');
+                                  if (!tempStartDate || (tempStartDate && tempEndDate)) {
+                                    setTempStartDate(dateStr);
+                                    setTempEndDate('');
+                                  } else {
+                                    if (dateStr >= tempStartDate) {
+                                      setTempEndDate(dateStr);
+                                    } else {
+                                      setTempStartDate(dateStr);
+                                    }
+                                  }
+                                }}
+                                className={`h-6 w-full rounded-md flex items-center justify-center font-bold relative border-0 cursor-pointer ${
+                                  isSelectedStart || isSelectedEnd
+                                    ? 'bg-blue-600 text-white z-10'
+                                    : isInRange
+                                    ? 'bg-blue-50 text-blue-700 rounded-none first:rounded-l-md last:rounded-r-md'
+                                    : 'text-slate-700 hover:bg-slate-100'
+                                }`}
+                              >
+                                {day}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* June 2026 Calendar starting Monday */}
+                      <div>
+                        <div className="grid grid-cols-7 text-center text-[10px] font-bold text-slate-400 mb-1">
+                          {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => <span key={d}>{d}</span>)}
+                        </div>
+                        <div className="grid grid-cols-7 gap-y-1 text-center text-[11px] font-bold">
+                          {[
+                            null, 1, 2, 3, 4, 5, 6,
+                            7, 8, 9, 10, 11, 12, 13,
+                            14, 15, 16, 17, 18, 19, 20,
+                            21, 22, 23, 24, 25, 26, 27,
+                            28, 29, 30
+                          ].map((day, idx) => {
+                            if (day === null) return <span key={`empty-june-${idx}`} />;
+                            const dateStr = `2026-06-${String(day).padStart(2, '0')}`;
+                            const isSelectedStart = tempStartDate === dateStr;
+                            const isSelectedEnd = tempEndDate === dateStr;
+                            const isInRange = tempStartDate && tempEndDate && dateStr >= tempStartDate && dateStr <= tempEndDate;
+
+                            return (
+                              <button
+                                key={`june-${day}`}
+                                onClick={() => {
+                                  setSelectedPreset('custom');
+                                  if (!tempStartDate || (tempStartDate && tempEndDate)) {
+                                    setTempStartDate(dateStr);
+                                    setTempEndDate('');
+                                  } else {
+                                    if (dateStr >= tempStartDate) {
+                                      setTempEndDate(dateStr);
+                                    } else {
+                                      setTempStartDate(dateStr);
+                                    }
+                                  }
+                                }}
+                                className={`h-6 w-full rounded-md flex items-center justify-center font-bold relative border-0 cursor-pointer ${
+                                  isSelectedStart || isSelectedEnd
+                                    ? 'bg-blue-600 text-white z-10'
+                                    : isInRange
+                                    ? 'bg-blue-50 text-blue-700 rounded-none'
+                                    : 'text-slate-700 hover:bg-slate-100'
+                                }`}
+                              >
+                                {day}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Comparison checkbox & select */}
+                    <div className="flex flex-wrap items-center gap-3 mt-4 pt-3.5 border-t border-slate-100">
+                      <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-slate-700 select-none">
+                        <input
+                          type="checkbox"
+                          checked={compareEnabled}
+                          onChange={(e) => setCompareEnabled(e.target.checked)}
+                          className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-slate-300"
+                        />
+                        <span>Compare</span>
+                      </label>
+                      <select
+                        disabled={!compareEnabled}
+                        value={comparePreset}
+                        onChange={(e) => setComparePreset(e.target.value)}
+                        className="h-8 border border-slate-200 rounded-lg px-2 text-[11px] font-bold text-slate-600 bg-white focus:outline-none disabled:opacity-40 disabled:bg-slate-50 cursor-pointer"
+                      >
+                        <option value="previous_period">Previous period</option>
+                        <option value="previous_year">Previous year</option>
+                      </select>
+
+                      {/* Display Date Range in Inputs box style */}
+                      <div className="ml-auto flex items-center gap-1.5">
+                        <div className="h-8 px-3 border border-slate-200 rounded-lg flex items-center justify-center text-[11px] font-bold text-slate-700 bg-slate-50">
+                          {tempStartDate ? new Date(tempStartDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Select date'}
+                        </div>
+                        <span className="text-slate-400 font-bold">-</span>
+                        <div className="h-8 px-3 border border-slate-200 rounded-lg flex items-center justify-center text-[11px] font-bold text-slate-700 bg-slate-50">
+                          {tempEndDate ? new Date(tempEndDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Select date'}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Footer Row */}
+                    <div className="flex items-center justify-between mt-4 pt-3 border-t border-slate-100">
+                      <span className="text-[10px] text-slate-400 italic font-semibold">
+                        Dates are shown in Kolkata Time
+                      </span>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => {
+                            setTempStartDate(startDate);
+                            setTempEndDate(endDate);
+                            setShowCalendarDropdown(false);
+                          }}
+                          className="h-8 px-4 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs rounded-xl transition-all cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (tempStartDate && tempEndDate) {
+                              setStartDate(tempStartDate);
+                              setEndDate(tempEndDate);
+                              
+                              const labelStart = new Date(tempStartDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+                              const labelEnd = new Date(tempEndDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+                              setSelectedRangeLabel(`${labelStart} - ${labelEnd}`);
+                              
+                              // Keep selectedMonth in sync with custom dates for other components
+                              const monthStr = tempEndDate.slice(0, 7); // e.g. "2026-05"
+                              setSelectedMonth(monthStr);
+                              
+                              setShowCalendarDropdown(false);
+                              toast.success(`Date filter updated: ${labelStart} - ${labelEnd}`);
+                            } else {
+                              toast.error('Please select both start and end dates.');
+                            }
+                          }}
+                          className="h-8 px-5 bg-blue-600 hover:bg-blue-700 text-white border-0 font-bold text-xs rounded-xl transition-all shadow-sm cursor-pointer"
+                        >
+                          Update
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </motion.div>
               </>

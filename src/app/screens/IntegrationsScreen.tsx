@@ -160,7 +160,7 @@ export default function IntegrationsScreen() {
                       <div>
                         <p className="text-[9px] text-slate-400 font-semibold mb-0.5">Spend</p>
                         <p className="text-xs font-bold text-slate-800 font-['JetBrains_Mono']">
-                          {ig.spend ? `$${(ig.spend / 1000).toFixed(1)}k` : '—'}
+                          {ig.spend ? `₹${(ig.spend / 1000).toFixed(1)}k` : '—'}
                         </p>
                       </div>
                       <div>

@@ -12,11 +12,11 @@ const STATIC_CLIENTS = [
     lightBg: 'bg-red-50',
     lightBorder: 'border-red-200',
     textColor: 'text-red-700',
-    monthlyBudget: 5000000,
+    monthlyBudget: 50000,
     platforms: ['Meta'],
     accountManager: 'CAI Mahindra Team',
     status: 'healthy',
-    retainer: '₹10.0L/mo',
+    retainer: '₹10.0k/mo',
     since: 'Jan 2026',
   },
 ];
